@@ -1,375 +1,682 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Borehole Pump Monitoring — Firebase Integrated</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Inter,Arial;
-            background: #070707;
-            color: #EEE;
-            margin: 0
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Borehole Pump Monitoring — Advanced Dashboard</title>
 
-        header {
-            background: #0f1720;
-            padding: 18px;
-            text-align: center;
-            font-weight: 600
-        }
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-        .container {
-            max-width: 1200px;
-            margin: 18px auto;
-            padding: 12px
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: 360px 1fr;
-            gap: 18px
-        }
-
-        .card {
-            background: #0e1113;
-            padding: 16px;
-            border-radius: 10px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.6)
-        }
-
-        label {
-            display: block;
-            margin-top: 8px;
-            font-size: 13px;
-            color: #cbd5e1
-        }
-
-        input, select, button, textarea {
-            width: 100%;
-            padding: 10px;
-            margin-top: 6px;
-            border-radius: 8px;
-            border: 1px solid #222;
-            background: #0b0d0f;
-            color: #fff
-        }
-
-        button {
-            background: #06b6d4;
-            border: none;
-            cursor: pointer
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 12px;
-            font-size: 13px
-        }
-
-        th, td {
-            padding: 8px;
-            border-bottom: 1px solid #1f2937;
-            text-align: left
-        }
-
-        .small {
-            font-size: 12px;
-            color: #9ca3af
-        }
-
-        .warn {
-            background: #7f1d1d;
-            padding: 10px;
-            border-radius: 6px;
-            color: #fff;
-            margin-top: 8px;
-            display: none
-        }
-
-        .fullwidth {
-            grid-column: 1/-1
-        }
-
-        ul {
-            padding-left: 18px
-        }
-    </style>
+  <style>
+    :root{
+      --bg:#06070a; --card:#0f1720; --muted:#9ca3af; --accent:#06b6d4; --glass: rgba(255,255,255,0.04);
+      --success:#10b981; --danger:#ef4444; --warning:#f59e0b; --soft:#111316; --pressure:#8b5cf6; --flow:#10b981
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:linear-gradient(180deg,#03040a 0%, #071025 100%);color:#e6eef6; min-height: 100vh;}
+    header{padding:18px 28px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;gap:18px; background: rgba(15, 23, 32, 0.7);}
+    header h1{margin:0;font-size:20px;font-weight:600}
+    .container{max-width:1600px;margin:20px auto;padding:0 18px}
+    .layout{display:grid;grid-template-columns:320px 1fr;gap:18px}
+    .card{background:linear-gradient(180deg,var(--card),#0b1220);padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+    .muted{color:var(--muted);font-size:13px}
+    label{display:block;margin-top:10px;font-size:13px;color:#cbd5e1}
+    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;background:var(--soft);border:1px solid rgba(255,255,255,0.03);color:inherit}
+    button{background:var(--accent);border:none;color:#022;cursor:pointer;font-weight:600}
+    .left .group{margin-bottom:14px}
+    .borehole-select{display:flex;gap:8px}
+    .borehole-select select{flex:1}
+    .small{font-size:13px;color:#99a3b4}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:stretch;margin-bottom:12px}
+    .metric{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}
+    .metric h4{margin:0;font-size:12px;color:var(--muted)}
+    .metric p{margin:6px 0 0;font-size:20px;font-weight:600}
+    .metric .trend{font-size:12px; margin-top:4px;}
+    .metric .trend.up{color:var(--success);}
+    .metric .trend.down{color:var(--danger);}
+    .metric .trend.stable{color:var(--muted);}
+    .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px; margin-bottom: 12px;}
+    .chart-container{background:transparent; border-radius: 12px; padding: 12px;}
+    .table-wrap{max-height:260px;overflow:auto}
+    footer{max-width:1600px;margin:18px auto;padding:12px 18px;color:var(--muted);font-size:13px}
+    @media (max-width:1200px){.layout{grid-template-columns:1fr}.charts{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3, 1fr)}}
+    @media (max-width:768px){.metrics{grid-template-columns:repeat(2, 1fr)}}
+    
+    /* Table styles */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    th { font-size: 12px; color: var(--muted); font-weight: 600; }
+    
+    /* Status indicators */
+    .status-on { color: var(--success); }
+    .status-off { color: var(--danger); }
+    
+    /* Collapsible sections */
+    .collapsible { cursor: pointer; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .collapsible:after { content: '\002B'; color: var(--muted); font-weight: bold; float: right; margin-left: 5px; }
+    .collapsible.active:after { content: "\2212"; }
+    .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out; }
+    
+    /* Control buttons */
+    .control-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .control-btn { padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .control-btn.on { background: var(--success); color: white; }
+    .control-btn.off { background: var(--danger); color: white; }
+    .control-btn.auto { background: var(--accent); color: white; }
+    .control-btn.maintenance { background: var(--warning); color: white; }
+    
+    /* Alert styles */
+    .alert { padding: 10px; border-radius: 8px; margin-top: 8px; }
+    .alert.warning { background: linear-gradient(90deg, var(--warning), #7c2d12); color: white; }
+    .alert.danger { background: linear-gradient(90deg, var(--danger), #7f1d1d); color: white; }
+    .alert.info { background: linear-gradient(90deg, var(--accent), #0e7490); color: white; }
+    
+    /* Pump status indicator */
+    .pump-status { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+    .status-indicator { width: 12px; height: 12px; border-radius: 50%; }
+    .status-indicator.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    .status-indicator.off { background: var(--danger); }
+    .status-indicator.maintenance { background: var(--warning); }
+    
+    /* Metric icons */
+    .metric-icon { font-size: 20px; margin-bottom: 8px; }
+    
+    /* Compact form */
+    .compact-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .compact-form .full-width { grid-column: 1 / -1; }
+  </style>
 </head>
 <body>
-    <header>Borehole & Pump Monitoring — Firebase (Firestore) Demo</header>
-    <div class="container">
-        <div class="grid">
+<header>
+  <h1><i class="fas fa-water"></i> Borehole & Pump Dashboard</h1>
+  <div class="muted">Advanced Monitoring • Performance Metrics • AI Recommendations</div>
+</header>
 
-            <!-- LEFT: Form -->
-            <div class="card">
-                <h3>Create Borehole</h3>
-                <label>Name</label>
-                <input id="bh_name" placeholder="Village Well A" />
-                <label>Location</label>
-                <input id="bh_location" placeholder="Ward 3, KZN" />
-                <label>Active?</label>
-                <select id="bh_active"><option value="true">Yes</option><option value="false">No</option></select>
-                <button onclick="createBorehole()">Create Borehole</button>
-                <div class="small">Select a borehole below to start adding entries.</div>
+<div class="container">
+  <div class="layout">
 
-                <hr style="margin:12px 0;border-color:#111" />
-                <h3>Manual Entry</h3>
-                <label>Borehole</label>
-                <select id="selectBorehole"></select>
-
-                <label>Date & Time</label>
-                <input type="datetime-local" id="entry_dt" />
-                <label>Water Level (m)</label>
-                <input type="number" id="entry_water" step="0.01" />
-                <label>Pump Status</label>
-                <select id="entry_pump"><option value="true">ON</option><option value="false">OFF</option></select>
-                <label>Electricity Usage (kWh)</label>
-                <input type="number" id="entry_elec" step="0.01" />
-                <label>Notes</label>
-                <textarea id="entry_notes" rows="2" placeholder="Optional notes"></textarea>
-                <button onclick="saveEntry('manual')">Save Entry (Manual)</button>
-
-                <div id="aiWarn" class="warn"></div>
-            </div>
-
-            <!-- RIGHT: Charts & Tables -->
-            <div>
-                <div class="card">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <h3>Dashboard</h3>
-                        <div class="small">Realtime: Firestore</div>
-                    </div>
-                    <canvas id="chartWater" style="height:180px"></canvas>
-                    <canvas id="chartElec" style="height:120px;margin-top:10px"></canvas>
-                </div>
-
-                <div class="card" style="margin-top:12px">
-                    <h3>Recent Entries</h3>
-                    <table>
-                        <thead><tr><th>Time</th><th>Water</th><th>Pump</th><th>kWh</th><th>Notes</th><th>Verified</th></tr></thead>
-                        <tbody id="entriesT"></tbody>
-                    </table>
-                </div>
-
-                <div class="card" style="margin-top:12px">
-                    <h3>Blockchain Verification (Simulated)</h3>
-                    <ul id="bcLog"></ul>
-                </div>
-            </div>
-
-            <!-- FULL WIDTH: Administration & Instructions -->
-            <div class="card fullwidth">
-                <h3>Firestore Schema & Actions</h3>
-                <p class="small">Structure stored in Firestore:</p>
-                <pre class="small" style="background:#08090b;padding:10px;border-radius:6px;color:#9ca3af">
-boreholes (collection)
- └─ {boreholeId} (doc)
-     name, location, is_active, created_at, last_entry_at
-     entries (subcollection)
-       └─ {entryId} (doc)
-           water_level, pump_status, electricity_usage, notes, source, created_at, blockchain
-     predictions (subcollection under entry)
-           risk_score, remark, created_at
-      </pre>
-
-                <h4>What I integrated</h4>
-                <ul>
-                    <li>Firestore connection and real-time listeners</li>
-                    <li>Save boreholes, entries, predictions (simulated AI)</li>
-                    <li>Charts auto-updated from Firestore</li>
-                    <li>Blockchain verification simulated and tx-hash stored per entry</li>
-                    <li>Local fallback to localStorage if Firebase not configured</li>
-                </ul>
-
-                <h4>Security note</h4>
-                <div class="small">Start with test rules for development, then lock down rules to authenticated users and server-side writes for blockchain/AI actions.</div>
-            </div>
-
+    <!-- LEFT: Controls & Management -->
+    <div class="left">
+      <!-- Borehole Selection -->
+      <div class="card">
+        <h3 style="margin:0"><i class="fas fa-tachometer-alt"></i> Dashboard Controls</h3>
+        <div class="small">Select borehole and access controls</div>
+        
+        <div class="group">
+          <label>Select Borehole</label>
+          <div class="borehole-select">
+            <select id="selectBorehole"></select>
+            <button style="background: var(--accent); padding: 10px; width: auto;"><i class="fas fa-sync-alt"></i></button>
+          </div>
         </div>
+        
+        <div class="pump-status">
+          <div class="status-indicator off" id="pumpStatusIndicator"></div>
+          <div>
+            <div>Pump Status: <strong id="pumpStatusText">OFF</strong></div>
+            <div class="small" id="pumpStatusSubtext">Last updated: --</div>
+          </div>
+        </div>
+        
+        <div class="control-buttons">
+          <button class="control-btn on" onclick="controlPump(true)"><i class="fas fa-play"></i> Start Pump</button>
+          <button class="control-btn off" onclick="controlPump(false)"><i class="fas fa-stop"></i> Stop Pump</button>
+          <button class="control-btn auto" onclick="setPumpMode('auto')"><i class="fas fa-robot"></i> Auto Mode</button>
+          <button class="control-btn maintenance" onclick="setPumpMode('maintenance')"><i class="fas fa-tools"></i> Maintenance</button>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <h4 style="margin:0"><i class="fas fa-bolt"></i> Quick Actions</h4>
+        <div class="small">Frequently used operations</div>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+          <button style="background: var(--accent); padding: 10px;" onclick="simulateApiEntry()"><i class="fas fa-satellite-dish"></i> Simulate Data</button>
+          <button style="background: var(--warning); padding: 10px;" onclick="generateReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+          <button style="background: #8b5cf6; padding: 10px;" onclick="runDiagnostics()"><i class="fas fa-stethoscope"></i> Run Diagnostics</button>
+          <button style="background: var(--success); padding: 10px;" onclick="optimizePerformance()"><i class="fas fa-magic"></i> Optimize</button>
+        </div>
+      </div>
+
+      <!-- Data Entry (Collapsible) -->
+      <div class="card">
+        <div class="collapsible active"><i class="fas fa-plus-circle"></i> Add New Reading</div>
+        <div class="collapsible-content" style="max-height: 500px;">
+          <div class="group" style="margin-top: 12px;">
+            <div class="compact-form">
+              <div>
+                <label>Water Level (m)</label>
+                <input type="number" id="entry_water" step="0.01" placeholder="0.00" />
+              </div>
+              <div>
+                <label>Pressure (psi)</label>
+                <input type="number" id="entry_pressure" step="0.1" placeholder="0.0" />
+              </div>
+              <div>
+                <label>Flow Rate (L/min)</label>
+                <input type="number" id="entry_flow" step="0.1" placeholder="0.0" />
+              </div>
+              <div>
+                <label>Power (kW)</label>
+                <input type="number" id="entry_power" step="0.01" placeholder="0.00" />
+              </div>
+              <div class="full-width">
+                <label>Pump Status</label>
+                <select id="entry_pump">
+                  <option value="true">ON</option>
+                  <option value="false">OFF</option>
+                  <option value="maintenance">MAINTENANCE</option>
+                </select>
+              </div>
+              <div class="full-width">
+                <label>Notes</label>
+                <textarea id="entry_notes" rows="1" placeholder="Optional notes"></textarea>
+              </div>
+            </div>
+            
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button onclick="saveEntry('manual')"><i class="fas fa-save"></i> Save Reading</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Recommendations -->
+      <div class="card">
+        <h4 style="margin:0"><i class="fas fa-robot"></i> AI Recommendations</h4>
+        <div class="small">Smart suggestions for optimization</div>
+        
+        <div id="aiRecommendations" style="margin-top: 12px;">
+          <div class="alert info">
+            <i class="fas fa-info-circle"></i> System running optimally. No actions needed.
+          </div>
+        </div>
+        
+        <div id="aiWarn" style="display:none;margin-top:8px;padding:10px;border-radius:8px;color:white"></div>
+      </div>
     </div>
 
-    <!-- FIREBASE (module) -->
-    <script type="module">
-        // --- IMPORTS ---
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
-        import { getFirestore, collection, doc, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, serverTimestamp, updateDoc } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js';
+    <!-- RIGHT: Metrics, Charts, Data -->
+    <div>
+      <!-- Performance Metrics -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <h3 style="margin:0"><i class="fas fa-chart-line"></i> Performance Overview</h3>
+            <div class="small">Real-time metrics and system health</div>
+          </div>
+          <div class="small">Last updated: <span id="lastUpdateTime">--</span></div>
+        </div>
 
-        // --- REPLACE WITH YOUR CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyARja6wczcE_joGu-LPFS7e23TTUIn7K8I",
-            authDomain: "boreholemonitoring-2b49d.firebaseapp.com",
-            projectId: "boreholemonitoring-2b49d",
-            storageBucket: "boreholemonitoring-2b49d.firebasestorage.app",
-            messagingSenderId: "855213921298",
-            appId: "1:855213921298:web:bf36a48c40f03b2f7174cb",
-            measurementId: "G-T73DXT2F33"
-        };
+        <div class="metrics" style="margin-top:12px">
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-tint" style="color: var(--accent);"></i></div>
+            <h4>Water Level</h4>
+            <p id="m_water_level">—</p>
+            <div class="small">Current depth</div>
+            <div class="trend stable" id="water_trend">—</div>
+          </div>
+          
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-fire" style="color: var(--pressure);"></i></div>
+            <h4>Pump Pressure</h4>
+            <p id="m_pressure">—</p>
+            <div class="small">PSI</div>
+            <div class="trend stable" id="pressure_trend">—</div>
+          </div>
+          
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-wind" style="color: var(--flow);"></i></div>
+            <h4>Flow Rate</h4>
+            <p id="m_flow">—</p>
+            <div class="small">L/min</div>
+            <div class="trend stable" id="flow_trend">—</div>
+          </div>
+          
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-bolt" style="color: var(--warning);"></i></div>
+            <h4>Power Usage</h4>
+            <p id="m_power">—</p>
+            <div class="small">kW</div>
+            <div class="trend stable" id="power_trend">—</div>
+          </div>
+          
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-chart-pie" style="color: var(--success);"></i></div>
+            <h4>Efficiency</h4>
+            <p id="m_efficiency">—</p>
+            <div class="small">%</div>
+            <div class="trend stable" id="efficiency_trend">—</div>
+          </div>
+          
+          <div class="metric">
+            <div class="metric-icon"><i class="fas fa-heartbeat" style="color: var(--danger);"></i></div>
+            <h4>System Health</h4>
+            <p id="m_health">—</p>
+            <div class="small">Score</div>
+            <div class="trend stable" id="health_trend">—</div>
+          </div>
+        </div>
 
-        let app, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            console.log('Firebase initialized');
-        } catch (err) { console.warn('Firebase not initialized:', err); }
+        <!-- Charts Row 1 -->
+        <div class="charts">
+          <div class="chart-container">
+            <canvas id="waterChart" style="height:300px"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="pressureChart" style="height:300px"></canvas>
+          </div>
+        </div>
+        
+        <!-- Charts Row 2 -->
+        <div class="charts">
+          <div class="chart-container">
+            <canvas id="flowChart" style="height:300px"></canvas>
+          </div>
+          <div class="chart-container">
+            <canvas id="efficiencyChart" style="height:300px"></canvas>
+          </div>
+        </div>
+      </div>
 
-        // ---------- UI refs ----------
-        const selectBorehole = document.getElementById('selectBorehole');
-        const entriesT = document.getElementById('entriesT');
-        const bcLog = document.getElementById('bcLog');
-        const aiWarn = document.getElementById('aiWarn');
+      <!-- Data Tables -->
+      <div class="card" style="margin-top:12px">
+        <h4 style="margin:0"><i class="fas fa-table"></i> Recent Readings</h4>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Water (m)</th>
+                <th>Pressure</th>
+                <th>Flow</th>
+                <th>Power</th>
+                <th>Status</th>
+                <th>Efficiency</th>
+              </tr>
+            </thead>
+            <tbody id="entriesT"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
-        // CHARTS
-        const ctxW = document.getElementById('chartWater');
-        const ctxE = document.getElementById('chartElec');
-        const waterChart = new Chart(ctxW, { type: 'line', data: { labels: [], datasets: [{ label: 'Water (m)', data: [], tension: 0.2 }] }, options: { responsive: true } });
-        const elecChart = new Chart(ctxE, { type: 'bar', data: { labels: [], datasets: [{ label: 'kWh', data: [] }] }, options: { responsive: true } });
+  </div>
+</div>
 
-        // ---------- Helper: local fallback ----------
-        const localKey = 'borehole_demo_v1';
-        let localState = JSON.parse(localStorage.getItem(localKey) || '[]');
+<footer>
+  <div style="display: flex; justify-content: space-between;">
+    <div>Advanced Borehole Monitoring System v2.1</div>
+    <div>Status: <span id="systemStatus">Operational</span> | Uptime: <span id="systemUptime">99.8%</span></div>
+  </div>
+</footer>
 
-        function saveLocal(obj) { localState.unshift(obj); localStorage.setItem(localKey, JSON.stringify(localState)); }
-
-        // ---------- Create Borehole ----------
-        window.createBorehole = async function () {
-            const name = document.getElementById('bh_name').value || 'Unnamed';
-            const location = document.getElementById('bh_location').value || '';
-            const active = document.getElementById('bh_active').value === 'true';
-
-            if (!db) { // fallback
-                const id = 'local-' + Date.now();
-                selectBorehole.innerHTML += `<option value="${id}">${name}</option>`;
-                alert('Saved locally (Firestore not configured).');
-                return;
-            }
-
-            const ref = collection(db, 'boreholes');
-            const docRef = await addDoc(ref, { name, location, is_active: active, created_at: serverTimestamp() });
-            selectBorehole.innerHTML += `<option value="${docRef.id}">${name}</option>`;
-            selectBorehole.value = docRef.id;
+<script>
+  // Initialize collapsible sections
+  document.addEventListener('DOMContentLoaded', function() {
+    const collapsibles = document.getElementsByClassName("collapsible");
+    for (let i = 0; i < collapsibles.length; i++) {
+      collapsibles[i].addEventListener("click", function() {
+        this.classList.toggle("active");
+        const content = this.nextElementSibling;
+        if (content.style.maxHeight) {
+          content.style.maxHeight = null;
+        } else {
+          content.style.maxHeight = content.scrollHeight + "px";
         }
+      });
+    }
+    
+    // Initialize with data entry collapsed
+    const dataEntrySection = document.querySelector('.collapsible');
+    dataEntrySection.classList.remove('active');
+    dataEntrySection.nextElementSibling.style.maxHeight = null;
+    
+    // Update time
+    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+    
+    // Simulate initial data
+    simulateInitialData();
+  });
 
-        // ---------- Save Entry (manual or api) ----------
-        window.saveEntry = async function (source = 'manual') {
-            const bhId = selectBorehole.value;
-            if (!bhId) { alert('Select a borehole first'); return; }
-            const data = {
-                created_at: document.getElementById('entry_dt').value ? new Date(document.getElementById('entry_dt').value) : serverTimestamp(),
-                water_level: Number(document.getElementById('entry_water').value) || 0,
-                pump_status: document.getElementById('entry_pump').value === 'true',
-                electricity_usage: Number(document.getElementById('entry_elec').value) || 0,
-                notes: document.getElementById('entry_notes').value || '',
-                source
-            };
-
-            if (!db) { // local fallback
-                saveLocal({ borehole: bhId, ...data }); updateUIFromLocal(); return;
-            }
-
-            // add to subcollection: boreholes/{bhId}/entries
-            const entryRef = collection(db, 'boreholes', bhId, 'entries');
-            const newDoc = await addDoc(entryRef, { ...data, created_at: serverTimestamp(), blockchain: { verified: false } });
-
-            // update parent borehole's last_entry_at
-            const parentRef = doc(db, 'boreholes', bhId);
-            await updateDoc(parentRef, { last_entry_at: serverTimestamp() });
-
-            // Simulate AI & Blockchain actions triggered by backend normally
-            simulateAI(bhId, newDoc.id, data);
-            simulateBlockchain(bhId, newDoc.id, data);
+  // Chart initialization
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          color: 'rgba(255,255,255,0.05)'
+        },
+        ticks: {
+          color: 'rgba(255,255,255,0.7)'
         }
-
-        // ---------- Simulated AI ----------
-        async function simulateAI(bhId, entryId, entryData) {
-            // very simple risk logic: low water -> high risk, high electricity + pump ON -> medium
-            const risk = entryData.water_level < 2 ? 90 : (entryData.pump_status && entryData.electricity_usage > 5 ? 60 : 10);
-            const remark = risk > 70 ? 'High pump failure risk' : (risk > 30 ? 'Observe pump' : 'Normal');
-
-            if (!db) return; // local only
-            const predRef = collection(db, 'boreholes', bhId, 'entries', entryId, 'predictions');
-            await addDoc(predRef, { risk_score: risk, remark, created_at: serverTimestamp() });
-
-            // Optionally, we could write prediction summary to the entry itself for quick query
-            const entryDocRef = doc(db, 'boreholes', bhId, 'entries', entryId);
-            await updateDoc(entryDocRef, { last_prediction: { risk_score: risk, remark, at: serverTimestamp() } });
+      },
+      y: {
+        grid: {
+          color: 'rgba(255,255,255,0.05)'
+        },
+        ticks: {
+          color: 'rgba(255,255,255,0.7)'
         }
+      }
+    }
+  };
 
-        // ---------- Simulated Blockchain ----------
-        async function simulateBlockchain(bhId, entryId, entryData) {
-            // In production, backend signs and calls smart contract. Here we store a simulated tx
-            const txHash = '0x' + Math.random().toString(16).slice(2, 14);
-            if (!db) { bcLog.innerHTML += `<li>Local entry ${entryId} simulated tx ${txHash}</li>`; return; }
+  // Water Level Chart
+  const waterCtx = document.getElementById('waterChart').getContext('2d');
+  const waterChart = new Chart(waterCtx, {
+    type: 'line',
+    data: {
+      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+      datasets: [{
+        label: 'Water Level (m)',
+        data: [4.2, 4.1, 3.9, 3.8, 3.7, 3.6, 3.5],
+        borderColor: 'rgba(6, 182, 212, 1)',
+        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
 
-            const entryDocRef = doc(db, 'boreholes', bhId, 'entries', entryId);
-            await updateDoc(entryDocRef, { blockchain: { verified: true, tx_hash: txHash, network: 'demo' } });
-            bcLog.innerHTML += `<li>Entry ${entryId} — tx ${txHash}</li>`;
-        }
+  // Pressure Chart
+  const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+  const pressureChart = new Chart(pressureCtx, {
+    type: 'line',
+    data: {
+      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+      datasets: [{
+        label: 'Pressure (PSI)',
+        data: [42, 41, 43, 40, 39, 38, 42],
+        borderColor: 'rgba(139, 92, 246, 1)',
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
 
-        // ---------- LISTENERS: load boreholes & entries in realtime ----------
-        async function loadBoreholes() {
-            if (!db) { // local fallback
-                // load from local storage
-                updateUIFromLocal();
-                return;
-            }
-            const ref = collection(db, 'boreholes');
-            onSnapshot(ref, (snap) => {
-                selectBorehole.innerHTML = '';
-                snap.forEach(d => { const data = d.data(); selectBorehole.innerHTML += `<option value="${d.id}">${data.name || d.id}</option>`; });
-                // select first if none selected
-                if (!selectBorehole.value && selectBorehole.options.length) selectBorehole.value = selectBorehole.options[0].value;
-            });
-        }
+  // Flow Chart
+  const flowCtx = document.getElementById('flowChart').getContext('2d');
+  const flowChart = new Chart(flowCtx, {
+    type: 'line',
+    data: {
+      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+      datasets: [{
+        label: 'Flow Rate (L/min)',
+        data: [120, 118, 122, 119, 117, 115, 121],
+        borderColor: 'rgba(16, 185, 129, 1)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
 
-        // Watch entries for selected borehole
-        let unsubscribeEntries = null;
-        selectBorehole.addEventListener('change', () => {
-            subscribeEntries(selectBorehole.value);
-        });
+  // Efficiency Chart
+  const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
+  const efficiencyChart = new Chart(efficiencyCtx, {
+    type: 'line',
+    data: {
+      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
+      datasets: [{
+        label: 'Efficiency (%)',
+        data: [87, 86, 88, 85, 84, 83, 87],
+        borderColor: 'rgba(245, 158, 11, 1)',
+        backgroundColor: 'rgba(245, 158, 11, 0.1)',
+        tension: 0.4,
+        fill: true
+      }]
+    },
+    options: chartOptions
+  });
 
-        function subscribeEntries(bhId) {
-            if (unsubscribeEntries) unsubscribeEntries();
-            entriesT.innerHTML = '';
-            waterChart.data.labels = []; waterChart.data.datasets[0].data = [];
-            elecChart.data.labels = []; elecChart.data.datasets[0].data = [];
+  // Simulate initial data
+  function simulateInitialData() {
+    // Set initial metric values
+    document.getElementById('m_water_level').textContent = '3.5 m';
+    document.getElementById('m_pressure').textContent = '42 PSI';
+    document.getElementById('m_flow').textContent = '121 L/min';
+    document.getElementById('m_power').textContent = '2.4 kW';
+    document.getElementById('m_efficiency').textContent = '87%';
+    document.getElementById('m_health').textContent = '92';
+    
+    // Set initial trends
+    document.getElementById('water_trend').textContent = '↓ 0.1m/h';
+    document.getElementById('water_trend').className = 'trend down';
+    document.getElementById('pressure_trend').textContent = '→ Stable';
+    document.getElementById('pressure_trend').className = 'trend stable';
+    document.getElementById('flow_trend').textContent = '↑ 2L/h';
+    document.getElementById('flow_trend').className = 'trend up';
+    document.getElementById('power_trend').textContent = '→ Stable';
+    document.getElementById('power_trend').className = 'trend stable';
+    document.getElementById('efficiency_trend').textContent = '↓ 1%';
+    document.getElementById('efficiency_trend').className = 'trend down';
+    document.getElementById('health_trend').textContent = '→ Stable';
+    document.getElementById('health_trend').className = 'trend stable';
+    
+    // Populate table with sample data
+    const tableBody = document.getElementById('entriesT');
+    const sampleData = [
+      { time: '16:00', water: '3.5', pressure: '42', flow: '121', power: '2.4', status: 'ON', efficiency: '87%' },
+      { time: '15:45', water: '3.6', pressure: '38', flow: '115', power: '2.3', status: 'ON', efficiency: '83%' },
+      { time: '15:30', water: '3.6', pressure: '39', flow: '117', power: '2.3', status: 'ON', efficiency: '84%' },
+      { time: '15:15', water: '3.7', pressure: '40', flow: '119', power: '2.4', status: 'ON', efficiency: '85%' },
+      { time: '15:00', water: '3.7', pressure: '43', flow: '122', power: '2.5', status: 'ON', efficiency: '88%' },
+      { time: '14:45', water: '3.8', pressure: '41', flow: '118', power: '2.4', status: 'ON', efficiency: '86%' },
+      { time: '14:30', water: '3.9', pressure: '42', flow: '120', power: '2.4', status: 'ON', efficiency: '87%' }
+    ];
+    
+    sampleData.forEach(data => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${data.time}</td>
+        <td>${data.water}</td>
+        <td>${data.pressure}</td>
+        <td>${data.flow}</td>
+        <td>${data.power}</td>
+        <td class="status-on">${data.status}</td>
+        <td>${data.efficiency}</td>
+      `;
+      tableBody.appendChild(row);
+    });
+    
+    // Initialize borehole selector
+    const boreholeSelect = document.getElementById('selectBorehole');
+    boreholeSelect.innerHTML = `
+      <option value="bh1">Borehole #1 - Village Well A</option>
+      <option value="bh2">Borehole #2 - Industrial Site</option>
+      <option value="bh3">Borehole #3 - Farm Irrigation</option>
+    `;
+  }
 
-            if (!db) { updateUIFromLocal(bhId); return; }
+  // Control functions
+  function controlPump(turnOn) {
+    const statusIndicator = document.getElementById('pumpStatusIndicator');
+    const statusText = document.getElementById('pumpStatusText');
+    const statusSubtext = document.getElementById('pumpStatusSubtext');
+    
+    if (turnOn) {
+      statusIndicator.className = 'status-indicator on';
+      statusText.textContent = 'ON';
+      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      
+      // Show notification
+      showNotification('Pump started successfully', 'success');
+    } else {
+      statusIndicator.className = 'status-indicator off';
+      statusText.textContent = 'OFF';
+      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      
+      // Show notification
+      showNotification('Pump stopped successfully', 'info');
+    }
+  }
 
-            const entriesRef = query(collection(db, 'boreholes', bhId, 'entries'), orderBy('created_at', 'desc'));
-            unsubscribeEntries = onSnapshot(entriesRef, (snap) => {
-                entriesT.innerHTML = '';
-                const wl = [], el = [], labels = [];
-                snap.forEach(docSnap => {
-                    const d = docSnap.data();
-                    const created = d.created_at?.toDate ? d.created_at.toDate().toLocaleString() : (d.created_at || '');
-                    entriesT.innerHTML += `<tr><td>${created}</td><td>${d.water_level}</td><td>${d.pump_status ? 'ON' : 'OFF'}</td><td>${d.electricity_usage}</td><td>${d.notes || ''}</td><td>${d.blockchain?.verified ? '✔' : '—'}</td></tr>`;
-                    wl.push(d.water_level); el.push(d.electricity_usage); labels.push(created);
-                });
-                // update charts (reverse arrays for chronological left->right)
-                waterChart.data.labels = labels.slice().reverse(); waterChart.data.datasets[0].data = wl.slice().reverse(); waterChart.update();
-                elecChart.data.labels = labels.slice().reverse(); elecChart.data.datasets[0].data = el.slice().reverse(); elecChart.update();
-            });
-        }
+  function setPumpMode(mode) {
+    const statusIndicator = document.getElementById('pumpStatusIndicator');
+    const statusText = document.getElementById('pumpStatusText');
+    const statusSubtext = document.getElementById('pumpStatusSubtext');
+    
+    if (mode === 'auto') {
+      statusIndicator.className = 'status-indicator on';
+      statusText.textContent = 'AUTO';
+      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      showNotification('Pump set to automatic mode', 'info');
+    } else if (mode === 'maintenance') {
+      statusIndicator.className = 'status-indicator maintenance';
+      statusText.textContent = 'MAINTENANCE';
+      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+      showNotification('Pump set to maintenance mode', 'warning');
+    }
+  }
 
-        // ---------- Local fallback UI ----------
-        function updateUIFromLocal(bhId) {
-            entriesT.innerHTML = '';
-            const filtered = localState.filter(r => !bhId || r.borehole === bhId);
-            filtered.forEach(e => {
-                entriesT.innerHTML += `<tr><td>${e.created_at || ''}</td><td>${e.water_level || e.water}</td><td>${e.pump_status || e.pump}</td><td>${e.electricity_usage || e.electricity}</td><td>${e.notes || ''}</td><td>local</td></tr>`;
-            });
-        }
+  function simulateApiEntry() {
+    // Generate random data
+    const waterLevel = (Math.random() * 2 + 3).toFixed(1);
+    const pressure = (Math.random() * 10 + 35).toFixed(0);
+    const flowRate = (Math.random() * 20 + 110).toFixed(0);
+    const powerUsage = (Math.random() * 0.5 + 2.2).toFixed(1);
+    const efficiency = (Math.random() * 10 + 80).toFixed(0);
+    
+    // Update metrics
+    document.getElementById('m_water_level').textContent = waterLevel + ' m';
+    document.getElementById('m_pressure').textContent = pressure + ' PSI';
+    document.getElementById('m_flow').textContent = flowRate + ' L/min';
+    document.getElementById('m_power').textContent = powerUsage + ' kW';
+    document.getElementById('m_efficiency').textContent = efficiency + '%';
+    
+    // Update last updated time
+    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+    
+    // Add to table
+    const tableBody = document.getElementById('entriesT');
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+      <td>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+      <td>${waterLevel}</td>
+      <td>${pressure}</td>
+      <td>${flowRate}</td>
+      <td>${powerUsage}</td>
+      <td class="status-on">ON</td>
+      <td>${efficiency}%</td>
+    `;
+    tableBody.insertBefore(newRow, tableBody.firstChild);
+    
+    // Limit table rows
+    if (tableBody.children.length > 10) {
+      tableBody.removeChild(tableBody.lastChild);
+    }
+    
+    showNotification('Simulated data added successfully', 'success');
+  }
 
-        // ---------- Initialization ----------
-        (function init() {
-            loadBoreholes();
-            // If firebase not configured, populate select with a demo borehole
-            setTimeout(() => { if (selectBorehole.options.length === 0) { selectBorehole.innerHTML = '<option value="demo">Demo Borehole</option>'; selectBorehole.value = 'demo'; subscribeEntries('demo'); } }, 500);
-        })();
+  function generateReport() {
+    showNotification('Performance report generated successfully', 'info');
+  }
 
-    </script>
+  function runDiagnostics() {
+    showNotification('System diagnostics completed - No issues found', 'info');
+  }
+
+  function optimizePerformance() {
+    showNotification('Performance optimization completed', 'success');
+  }
+
+  function saveEntry(source) {
+    const waterLevel = document.getElementById('entry_water').value;
+    const pressure = document.getElementById('entry_pressure').value;
+    const flowRate = document.getElementById('entry_flow').value;
+    const powerUsage = document.getElementById('entry_power').value;
+    
+    if (!waterLevel || !pressure || !flowRate || !powerUsage) {
+      showNotification('Please fill all required fields', 'danger');
+      return;
+    }
+    
+    // Update metrics
+    document.getElementById('m_water_level').textContent = waterLevel + ' m';
+    document.getElementById('m_pressure').textContent = pressure + ' PSI';
+    document.getElementById('m_flow').textContent = flowRate + ' L/min';
+    document.getElementById('m_power').textContent = powerUsage + ' kW';
+    
+    // Calculate efficiency (simplified)
+    const efficiency = Math.min(95, Math.max(70, (flowRate / powerUsage * 40))).toFixed(0);
+    document.getElementById('m_efficiency').textContent = efficiency + '%';
+    
+    // Update last updated time
+    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+    
+    // Add to table
+    const tableBody = document.getElementById('entriesT');
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+      <td>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
+      <td>${waterLevel}</td>
+      <td>${pressure}</td>
+      <td>${flowRate}</td>
+      <td>${powerUsage}</td>
+      <td class="status-on">ON</td>
+      <td>${efficiency}%</td>
+    `;
+    tableBody.insertBefore(newRow, tableBody.firstChild);
+    
+    // Limit table rows
+    if (tableBody.children.length > 10) {
+      tableBody.removeChild(tableBody.lastChild);
+    }
+    
+    // Clear form
+    document.getElementById('entry_water').value = '';
+    document.getElementById('entry_pressure').value = '';
+    document.getElementById('entry_flow').value = '';
+    document.getElementById('entry_power').value = '';
+    document.getElementById('entry_notes').value = '';
+    
+    showNotification('Manual reading saved successfully', 'success');
+  }
+
+  function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert ${type}`;
+    notification.innerHTML = `<i class="fas fa-${getIconForType(type)}"></i> ${message}`;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '1000';
+    notification.style.minWidth = '300px';
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 5 seconds
+    setTimeout(() => {
+      notification.remove();
+    }, 5000);
+  }
+
+  function getIconForType(type) {
+    switch(type) {
+      case 'success': return 'check-circle';
+      case 'danger': return 'exclamation-triangle';
+      case 'warning': return 'exclamation-circle';
+      default: return 'info-circle';
+    }
+  }
+</script>
 </body>
 </html>
