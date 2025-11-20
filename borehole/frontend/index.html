@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Borehole Pump Monitoring — Firebase Integrated</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Inter,Arial;
+            background: #070707;
+            color: #EEE;
+            margin: 0
+        }
+
+        header {
+            background: #0f1720;
+            padding: 18px;
+            text-align: center;
+            font-weight: 600
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 18px auto;
+            padding: 12px
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 18px
+        }
+
+        .card {
+            background: #0e1113;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.6)
+        }
+
+        label {
+            display: block;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #cbd5e1
+        }
+
+        input, select, button, textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 6px;
+            border-radius: 8px;
+            border: 1px solid #222;
+            background: #0b0d0f;
+            color: #fff
+        }
+
+        button {
+            background: #06b6d4;
+            border: none;
+            cursor: pointer
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 13px
+        }
+
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #1f2937;
+            text-align: left
+        }
+
+        .small {
+            font-size: 12px;
+            color: #9ca3af
+        }
+
+        .warn {
+            background: #7f1d1d;
+            padding: 10px;
+            border-radius: 6px;
+            color: #fff;
+            margin-top: 8px;
+            display: none
+        }
+
+        .fullwidth {
+            grid-column: 1/-1
+        }
+
+        ul {
+            padding-left: 18px
+        }
+    </style>
+</head>
+<body>
+    <header>Borehole & Pump Monitoring — Firebase (Firestore) Demo</header>
+    <div class="container">
+        <div class="grid">
+
+            <!-- LEFT: Form -->
+            <div class="card">
+                <h3>Create Borehole</h3>
+                <label>Name</label>
+                <input id="bh_name" placeholder="Village Well A" />
+                <label>Location</label>
+                <input id="bh_location" placeholder="Ward 3, KZN" />
+                <label>Active?</label>
+                <select id="bh_active"><option value="true">Yes</option><option value="false">No</option></select>
+                <button onclick="createBorehole()">Create Borehole</button>
+                <div class="small">Select a borehole below to start adding entries.</div>
+
+                <hr style="margin:12px 0;border-color:#111" />
+                <h3>Manual Entry</h3>
+                <label>Borehole</label>
+                <select id="selectBorehole"></select>
+
+                <label>Date & Time</label>
+                <input type="datetime-local" id="entry_dt" />
+                <label>Water Level (m)</label>
+                <input type="number" id="entry_water" step="0.01" />
+                <label>Pump Status</label>
+                <select id="entry_pump"><option value="true">ON</option><option value="false">OFF</option></select>
+                <label>Electricity Usage (kWh)</label>
+                <input type="number" id="entry_elec" step="0.01" />
+                <label>Notes</label>
+                <textarea id="entry_notes" rows="2" placeholder="Optional notes"></textarea>
+                <button onclick="saveEntry('manual')">Save Entry (Manual)</button>
+
+                <div id="aiWarn" class="warn"></div>
+            </div>
+
+            <!-- RIGHT: Charts & Tables -->
+            <div>
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <h3>Dashboard</h3>
+                        <div class="small">Realtime: Firestore</div>
+                    </div>
+                    <canvas id="chartWater" style="height:180px"></canvas>
+                    <canvas id="chartElec" style="height:120px;margin-top:10px"></canvas>
+                </div>
+
+                <div class="card" style="margin-top:12px">
+                    <h3>Recent Entries</h3>
+                    <table>
+                        <thead><tr><th>Time</th><th>Water</th><th>Pump</th><th>kWh</th><th>Notes</th><th>Verified</th></tr></thead>
+                        <tbody id="entriesT"></tbody>
+                    </table>
+                </div>
+
+                <div class="card" style="margin-top:12px">
+                    <h3>Blockchain Verification (Simulated)</h3>
+                    <ul id="bcLog"></ul>
+                </div>
+            </div>
+
+            <!-- FULL WIDTH: Administration & Instructions -->
+            <div class="card fullwidth">
+                <h3>Firestore Schema & Actions</h3>
+                <p class="small">Structure stored in Firestore:</p>
+                <pre class="small" style="background:#08090b;padding:10px;border-radius:6px;color:#9ca3af">
+boreholes (collection)
+ └─ {boreholeId} (doc)
+     name, location, is_active, created_at, last_entry_at
+     entries (subcollection)
+       └─ {entryId} (doc)
+           water_level, pump_status, electricity_usage, notes, source, created_at, blockchain
+     predictions (subcollection under entry)
+           risk_score, remark, created_at
+      </pre>
+
+                <h4>What I integrated</h4>
+                <ul>
+                    <li>Firestore connection and real-time listeners</li>
+                    <li>Save boreholes, entries, predictions (simulated AI)</li>
+                    <li>Charts auto-updated from Firestore</li>
+                    <li>Blockchain verification simulated and tx-hash stored per entry</li>
+                    <li>Local fallback to localStorage if Firebase not configured</li>
+                </ul>
+
+                <h4>Security note</h4>
+                <div class="small">Start with test rules for development, then lock down rules to authenticated users and server-side writes for blockchain/AI actions.</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- FIREBASE (module) -->
+    <script type="module">
+        // --- IMPORTS ---
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js';
+        import { getFirestore, collection, doc, addDoc, setDoc, getDocs, onSnapshot, query, orderBy, serverTimestamp, updateDoc } from 'https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js';
+
+        // --- REPLACE WITH YOUR CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyARja6wczcE_joGu-LPFS7e23TTUIn7K8I",
+            authDomain: "boreholemonitoring-2b49d.firebaseapp.com",
+            projectId: "boreholemonitoring-2b49d",
+            storageBucket: "boreholemonitoring-2b49d.firebasestorage.app",
+            messagingSenderId: "855213921298",
+            appId: "1:855213921298:web:bf36a48c40f03b2f7174cb",
+            measurementId: "G-T73DXT2F33"
+        };
+
+        let app, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            console.log('Firebase initialized');
+        } catch (err) { console.warn('Firebase not initialized:', err); }
+
+        // ---------- UI refs ----------
+        const selectBorehole = document.getElementById('selectBorehole');
+        const entriesT = document.getElementById('entriesT');
+        const bcLog = document.getElementById('bcLog');
+        const aiWarn = document.getElementById('aiWarn');
+
+        // CHARTS
+        const ctxW = document.getElementById('chartWater');
+        const ctxE = document.getElementById('chartElec');
+        const waterChart = new Chart(ctxW, { type: 'line', data: { labels: [], datasets: [{ label: 'Water (m)', data: [], tension: 0.2 }] }, options: { responsive: true } });
+        const elecChart = new Chart(ctxE, { type: 'bar', data: { labels: [], datasets: [{ label: 'kWh', data: [] }] }, options: { responsive: true } });
+
+        // ---------- Helper: local fallback ----------
+        const localKey = 'borehole_demo_v1';
+        let localState = JSON.parse(localStorage.getItem(localKey) || '[]');
+
+        function saveLocal(obj) { localState.unshift(obj); localStorage.setItem(localKey, JSON.stringify(localState)); }
+
+        // ---------- Create Borehole ----------
+        window.createBorehole = async function () {
+            const name = document.getElementById('bh_name').value || 'Unnamed';
+            const location = document.getElementById('bh_location').value || '';
+            const active = document.getElementById('bh_active').value === 'true';
+
+            if (!db) { // fallback
+                const id = 'local-' + Date.now();
+                selectBorehole.innerHTML += `<option value="${id}">${name}</option>`;
+                alert('Saved locally (Firestore not configured).');
+                return;
+            }
+
+            const ref = collection(db, 'boreholes');
+            const docRef = await addDoc(ref, { name, location, is_active: active, created_at: serverTimestamp() });
+            selectBorehole.innerHTML += `<option value="${docRef.id}">${name}</option>`;
+            selectBorehole.value = docRef.id;
+        }
+
+        // ---------- Save Entry (manual or api) ----------
+        window.saveEntry = async function (source = 'manual') {
+            const bhId = selectBorehole.value;
+            if (!bhId) { alert('Select a borehole first'); return; }
+            const data = {
+                created_at: document.getElementById('entry_dt').value ? new Date(document.getElementById('entry_dt').value) : serverTimestamp(),
+                water_level: Number(document.getElementById('entry_water').value) || 0,
+                pump_status: document.getElementById('entry_pump').value === 'true',
+                electricity_usage: Number(document.getElementById('entry_elec').value) || 0,
+                notes: document.getElementById('entry_notes').value || '',
+                source
+            };
+
+            if (!db) { // local fallback
+                saveLocal({ borehole: bhId, ...data }); updateUIFromLocal(); return;
+            }
+
+            // add to subcollection: boreholes/{bhId}/entries
+            const entryRef = collection(db, 'boreholes', bhId, 'entries');
+            const newDoc = await addDoc(entryRef, { ...data, created_at: serverTimestamp(), blockchain: { verified: false } });
+
+            // update parent borehole's last_entry_at
+            const parentRef = doc(db, 'boreholes', bhId);
+            await updateDoc(parentRef, { last_entry_at: serverTimestamp() });
+
+            // Simulate AI & Blockchain actions triggered by backend normally
+            simulateAI(bhId, newDoc.id, data);
+            simulateBlockchain(bhId, newDoc.id, data);
+        }
+
+        // ---------- Simulated AI ----------
+        async function simulateAI(bhId, entryId, entryData) {
+            // very simple risk logic: low water -> high risk, high electricity + pump ON -> medium
+            const risk = entryData.water_level < 2 ? 90 : (entryData.pump_status && entryData.electricity_usage > 5 ? 60 : 10);
+            const remark = risk > 70 ? 'High pump failure risk' : (risk > 30 ? 'Observe pump' : 'Normal');
+
+            if (!db) return; // local only
+            const predRef = collection(db, 'boreholes', bhId, 'entries', entryId, 'predictions');
+            await addDoc(predRef, { risk_score: risk, remark, created_at: serverTimestamp() });
+
+            // Optionally, we could write prediction summary to the entry itself for quick query
+            const entryDocRef = doc(db, 'boreholes', bhId, 'entries', entryId);
+            await updateDoc(entryDocRef, { last_prediction: { risk_score: risk, remark, at: serverTimestamp() } });
+        }
+
+        // ---------- Simulated Blockchain ----------
+        async function simulateBlockchain(bhId, entryId, entryData) {
+            // In production, backend signs and calls smart contract. Here we store a simulated tx
+            const txHash = '0x' + Math.random().toString(16).slice(2, 14);
+            if (!db) { bcLog.innerHTML += `<li>Local entry ${entryId} simulated tx ${txHash}</li>`; return; }
+
+            const entryDocRef = doc(db, 'boreholes', bhId, 'entries', entryId);
+            await updateDoc(entryDocRef, { blockchain: { verified: true, tx_hash: txHash, network: 'demo' } });
+            bcLog.innerHTML += `<li>Entry ${entryId} — tx ${txHash}</li>`;
+        }
+
+        // ---------- LISTENERS: load boreholes & entries in realtime ----------
+        async function loadBoreholes() {
+            if (!db) { // local fallback
+                // load from local storage
+                updateUIFromLocal();
+                return;
+            }
+            const ref = collection(db, 'boreholes');
+            onSnapshot(ref, (snap) => {
+                selectBorehole.innerHTML = '';
+                snap.forEach(d => { const data = d.data(); selectBorehole.innerHTML += `<option value="${d.id}">${data.name || d.id}</option>`; });
+                // select first if none selected
+                if (!selectBorehole.value && selectBorehole.options.length) selectBorehole.value = selectBorehole.options[0].value;
+            });
+        }
+
+        // Watch entries for selected borehole
+        let unsubscribeEntries = null;
+        selectBorehole.addEventListener('change', () => {
+            subscribeEntries(selectBorehole.value);
+        });
+
+        function subscribeEntries(bhId) {
+            if (unsubscribeEntries) unsubscribeEntries();
+            entriesT.innerHTML = '';
+            waterChart.data.labels = []; waterChart.data.datasets[0].data = [];
+            elecChart.data.labels = []; elecChart.data.datasets[0].data = [];
+
+            if (!db) { updateUIFromLocal(bhId); return; }
+
+            const entriesRef = query(collection(db, 'boreholes', bhId, 'entries'), orderBy('created_at', 'desc'));
+            unsubscribeEntries = onSnapshot(entriesRef, (snap) => {
+                entriesT.innerHTML = '';
+                const wl = [], el = [], labels = [];
+                snap.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const created = d.created_at?.toDate ? d.created_at.toDate().toLocaleString() : (d.created_at || '');
+                    entriesT.innerHTML += `<tr><td>${created}</td><td>${d.water_level}</td><td>${d.pump_status ? 'ON' : 'OFF'}</td><td>${d.electricity_usage}</td><td>${d.notes || ''}</td><td>${d.blockchain?.verified ? '✔' : '—'}</td></tr>`;
+                    wl.push(d.water_level); el.push(d.electricity_usage); labels.push(created);
+                });
+                // update charts (reverse arrays for chronological left->right)
+                waterChart.data.labels = labels.slice().reverse(); waterChart.data.datasets[0].data = wl.slice().reverse(); waterChart.update();
+                elecChart.data.labels = labels.slice().reverse(); elecChart.data.datasets[0].data = el.slice().reverse(); elecChart.update();
+            });
+        }
+
+        // ---------- Local fallback UI ----------
+        function updateUIFromLocal(bhId) {
+            entriesT.innerHTML = '';
+            const filtered = localState.filter(r => !bhId || r.borehole === bhId);
+            filtered.forEach(e => {
+                entriesT.innerHTML += `<tr><td>${e.created_at || ''}</td><td>${e.water_level || e.water}</td><td>${e.pump_status || e.pump}</td><td>${e.electricity_usage || e.electricity}</td><td>${e.notes || ''}</td><td>local</td></tr>`;
+            });
+        }
+
+        // ---------- Initialization ----------
+        (function init() {
+            loadBoreholes();
+            // If firebase not configured, populate select with a demo borehole
+            setTimeout(() => { if (selectBorehole.options.length === 0) { selectBorehole.innerHTML = '<option value="demo">Demo Borehole</option>'; selectBorehole.value = 'demo'; subscribeEntries('demo'); } }, 500);
+        })();
+
+    </script>
+</body>
+</html>
