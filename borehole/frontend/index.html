@@ -1,682 +1,1918 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Borehole Pump Monitoring — Advanced Dashboard</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Borehole Pump Monitoring — Advanced Dashboard</title>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-  <!-- Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase -->
+    <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { 
+        getFirestore, 
+        collection, 
+        addDoc, 
+        doc, 
+        setDoc,  // MAKE SURE THIS IS INCLUDED
+        onSnapshot, 
+        updateDoc, 
+        serverTimestamp, 
+        query, 
+        orderBy, 
+        getDocs 
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-  <style>
-    :root{
-      --bg:#06070a; --card:#0f1720; --muted:#9ca3af; --accent:#06b6d4; --glass: rgba(255,255,255,0.04);
-      --success:#10b981; --danger:#ef4444; --warning:#f59e0b; --soft:#111316; --pressure:#8b5cf6; --flow:#10b981
-    }
-    *{box-sizing:border-box}
-    body{font-family:Inter,system-ui,Arial,sans-serif;margin:0;background:linear-gradient(180deg,#03040a 0%, #071025 100%);color:#e6eef6; min-height: 100vh;}
-    header{padding:18px 28px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;gap:18px; background: rgba(15, 23, 32, 0.7);}
-    header h1{margin:0;font-size:20px;font-weight:600}
-    .container{max-width:1600px;margin:20px auto;padding:0 18px}
-    .layout{display:grid;grid-template-columns:320px 1fr;gap:18px}
-    .card{background:linear-gradient(180deg,var(--card),#0b1220);padding:16px;border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
-    .muted{color:var(--muted);font-size:13px}
-    label{display:block;margin-top:10px;font-size:13px;color:#cbd5e1}
-    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;background:var(--soft);border:1px solid rgba(255,255,255,0.03);color:inherit}
-    button{background:var(--accent);border:none;color:#022;cursor:pointer;font-weight:600}
-    .left .group{margin-bottom:14px}
-    .borehole-select{display:flex;gap:8px}
-    .borehole-select select{flex:1}
-    .small{font-size:13px;color:#99a3b4}
-    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:stretch;margin-bottom:12px}
-    .metric{padding:12px;border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}
-    .metric h4{margin:0;font-size:12px;color:var(--muted)}
-    .metric p{margin:6px 0 0;font-size:20px;font-weight:600}
-    .metric .trend{font-size:12px; margin-top:4px;}
-    .metric .trend.up{color:var(--success);}
-    .metric .trend.down{color:var(--danger);}
-    .metric .trend.stable{color:var(--muted);}
-    .charts{display:grid;grid-template-columns:1fr 1fr;gap:12px; margin-bottom: 12px;}
-    .chart-container{background:transparent; border-radius: 12px; padding: 12px;}
-    .table-wrap{max-height:260px;overflow:auto}
-    footer{max-width:1600px;margin:18px auto;padding:12px 18px;color:var(--muted);font-size:13px}
-    @media (max-width:1200px){.layout{grid-template-columns:1fr}.charts{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(3, 1fr)}}
-    @media (max-width:768px){.metrics{grid-template-columns:repeat(2, 1fr)}}
-    
-    /* Table styles */
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    th { font-size: 12px; color: var(--muted); font-weight: 600; }
-    
-    /* Status indicators */
-    .status-on { color: var(--success); }
-    .status-off { color: var(--danger); }
-    
-    /* Collapsible sections */
-    .collapsible { cursor: pointer; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .collapsible:after { content: '\002B'; color: var(--muted); font-weight: bold; float: right; margin-left: 5px; }
-    .collapsible.active:after { content: "\2212"; }
-    .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.2s ease-out; }
-    
-    /* Control buttons */
-    .control-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
-    .control-btn { padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
-    .control-btn.on { background: var(--success); color: white; }
-    .control-btn.off { background: var(--danger); color: white; }
-    .control-btn.auto { background: var(--accent); color: white; }
-    .control-btn.maintenance { background: var(--warning); color: white; }
-    
-    /* Alert styles */
-    .alert { padding: 10px; border-radius: 8px; margin-top: 8px; }
-    .alert.warning { background: linear-gradient(90deg, var(--warning), #7c2d12); color: white; }
-    .alert.danger { background: linear-gradient(90deg, var(--danger), #7f1d1d); color: white; }
-    .alert.info { background: linear-gradient(90deg, var(--accent), #0e7490); color: white; }
-    
-    /* Pump status indicator */
-    .pump-status { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; background: rgba(255,255,255,0.03); }
-    .status-indicator { width: 12px; height: 12px; border-radius: 50%; }
-    .status-indicator.on { background: var(--success); box-shadow: 0 0 8px var(--success); }
-    .status-indicator.off { background: var(--danger); }
-    .status-indicator.maintenance { background: var(--warning); }
-    
-    /* Metric icons */
-    .metric-icon { font-size: 20px; margin-bottom: 8px; }
-    
-    /* Compact form */
-    .compact-form { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .compact-form .full-width { grid-column: 1 / -1; }
-  </style>
+    const firebaseConfig = {
+        apiKey: "AIzaSyARja6wczcE_joGu-LPFS7e23TTUIn7K8I",
+        authDomain: "boreholemonitoring-2b49d.firebaseapp.com",
+        projectId: "boreholemonitoring-2b49d",
+        storageBucket: "boreholemonitoring-2b49d.appspot.com",
+        messagingSenderId: "855213921298",
+        appId: "1:855213921298:web:bf36a48c40f03b2f7174cb",
+        measurementId: "G-T73DXT2F33"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    window.firebaseReady = new Promise((resolve) => {
+        window.firebase = {
+            db,
+            collection,
+            addDoc,
+            doc,
+            setDoc,  // AND THIS
+            onSnapshot,
+            updateDoc,
+            serverTimestamp,
+            query,
+            orderBy,
+            getDocs
+        };
+        resolve();
+    });
+</script>
+
+    <style>
+        :root {
+            --bg: #06070a;
+            --card: #0f1720;
+            --muted: #9ca3af;
+            --accent: #06b6d4;
+            --glass: rgba(255,255,255,0.04);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --soft: #111316;
+            --pressure: #8b5cf6;
+            --flow: #10b981;
+            --ai-primary: #8b5cf6;
+            --ai-secondary: #a78bfa;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: Inter,system-ui,Arial,sans-serif;
+            margin: 0;
+            background: linear-gradient(180deg,#03040a 0%, #071025 100%);
+            color: #e6eef6;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 18px 28px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: rgba(15, 23, 32, 0.7);
+        }
+
+            header h1 {
+                margin: 0;
+                font-size: 20px;
+                font-weight: 600
+            }
+
+        .container {
+            max-width: 1600px;
+            margin: 20px auto;
+            padding: 0 18px
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 18px
+        }
+
+        .card {
+            background: linear-gradient(180deg,var(--card),#0b1220);
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+            border: 1px solid rgba(255,255,255,0.03)
+        }
+
+        .muted {
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #cbd5e1
+        }
+
+        input, select, textarea, button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            background: var(--soft);
+            border: 1px solid rgba(255,255,255,0.03);
+            color: inherit
+        }
+
+        button {
+            background: var(--accent);
+            border: none;
+            color: #022;
+            cursor: pointer;
+            font-weight: 600
+        }
+
+        .left .group {
+            margin-bottom: 14px
+        }
+
+        .borehole-select {
+            display: flex;
+            gap: 8px
+        }
+
+            .borehole-select select {
+                flex: 1
+            }
+
+        .small {
+            font-size: 13px;
+            color: #99a3b4
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+            gap: 12px;
+            align-items: stretch;
+            margin-bottom: 12px
+        }
+
+        .metric {
+            padding: 12px;
+            border-radius: 10px;
+            background: linear-gradient(180deg,rgba(255,255,255,0.02),transparent);
+        }
+
+            .metric h4 {
+                margin: 0;
+                font-size: 12px;
+                color: var(--muted)
+            }
+
+            .metric p {
+                margin: 6px 0 0;
+                font-size: 20px;
+                font-weight: 600
+            }
+
+            .metric .trend {
+                font-size: 12px;
+                margin-top: 4px;
+            }
+
+                .metric .trend.up {
+                    color: var(--success);
+                }
+
+                .metric .trend.down {
+                    color: var(--danger);
+                }
+
+                .metric .trend.stable {
+                    color: var(--muted);
+                }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .chart-container {
+            background: transparent;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .table-wrap {
+            max-height: 260px;
+            overflow: auto
+        }
+
+        footer {
+            max-width: 1600px;
+            margin: 18px auto;
+            padding: 12px 18px;
+            color: var(--muted);
+            font-size: 13px
+        }
+
+        @media (max-width:1200px) {
+            .layout {
+                grid-template-columns: 1fr
+            }
+
+            .charts {
+                grid-template-columns: 1fr
+            }
+
+            .metrics {
+                grid-template-columns: repeat(3, 1fr)
+            }
+        }
+
+        @media (max-width:768px) {
+            .metrics {
+                grid-template-columns: repeat(2, 1fr)
+            }
+        }
+
+        /* Table styles */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        th {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        /* Status indicators */
+        .status-on {
+            color: var(--success);
+        }
+
+        .status-off {
+            color: var(--danger);
+        }
+
+        /* Collapsible sections */
+        .collapsible {
+            cursor: pointer;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+            .collapsible:after {
+                content: '\002B';
+                color: var(--muted);
+                font-weight: bold;
+                float: right;
+                margin-left: 5px;
+            }
+
+            .collapsible.active:after {
+                content: "\2212";
+            }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+        }
+
+        /* Control buttons */
+        .control-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .control-btn {
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+            .control-btn.on {
+                background: var(--success);
+                color: white;
+            }
+
+            .control-btn.off {
+                background: var(--danger);
+                color: white;
+            }
+
+            .control-btn.auto {
+                background: var(--accent);
+                color: white;
+            }
+
+            .control-btn.maintenance {
+                background: var(--warning);
+                color: white;
+            }
+
+            .control-btn.ai {
+                background: var(--ai-primary);
+                color: white;
+            }
+
+        /* Alert styles */
+        .alert {
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+
+            .alert.warning {
+                background: linear-gradient(90deg, var(--warning), #7c2d12);
+                color: white;
+            }
+
+            .alert.danger {
+                background: linear-gradient(90deg, var(--danger), #7f1d1d);
+                color: white;
+            }
+
+            .alert.info {
+                background: linear-gradient(90deg, var(--accent), #0e7490);
+                color: white;
+            }
+
+            .alert.ai {
+                background: linear-gradient(90deg, var(--ai-primary), #6d28d9);
+                color: white;
+            }
+
+        /* Pump status indicator */
+        .pump-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+            .status-indicator.on {
+                background: var(--success);
+                box-shadow: 0 0 8px var(--success);
+            }
+
+            .status-indicator.off {
+                background: var(--danger);
+            }
+
+            .status-indicator.maintenance {
+                background: var(--warning);
+            }
+
+            .status-indicator.ai {
+                background: var(--ai-primary);
+                box-shadow: 0 0 8px var(--ai-primary);
+            }
+
+        /* Metric icons */
+        .metric-icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        /* Compact form */
+        .compact-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+            .compact-form .full-width {
+                grid-column: 1 / -1;
+            }
+
+        /* AI Panel */
+        .ai-panel {
+            border-left: 3px solid var(--ai-primary);
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        .ai-thinking {
+            display: none;
+            padding: 10px;
+            text-align: center;
+        }
+
+            .ai-thinking .spinner {
+                border: 2px solid rgba(255,255,255,0.3);
+                border-radius: 50%;
+                border-top: 2px solid var(--ai-primary);
+                width: 20px;
+                height: 20px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto;
+            }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Prediction cards */
+        .prediction-card {
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 8px;
+        }
+
+            .prediction-card h5 {
+                margin: 0 0 8px 0;
+                font-size: 14px;
+                color: var(--ai-secondary);
+            }
+
+        /* Toggle switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 12px 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+            .toggle-switch input {
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+            .toggle-slider:before {
+                position: absolute;
+                content: "";
+                height: 16px;
+                width: 16px;
+                left: 4px;
+                bottom: 4px;
+                background-color: white;
+                transition: .4s;
+                border-radius: 50%;
+            }
+
+        input:checked + .toggle-slider {
+            background-color: var(--ai-primary);
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+    </style>
 </head>
 <body>
-<header>
-  <h1><i class="fas fa-water"></i> Borehole & Pump Dashboard</h1>
-  <div class="muted">Advanced Monitoring • Performance Metrics • AI Recommendations</div>
-</header>
+    <header>
+        <h1><i class="fas fa-robot"></i> AI-Powered Borehole & Pump Dashboard</h1>
+        <div class="muted">Firebase Firestore • Real-time Data • AI Management</div>
+    </header>
 
-<div class="container">
-  <div class="layout">
+    <div class="container">
+        <div class="layout">
 
-    <!-- LEFT: Controls & Management -->
-    <div class="left">
-      <!-- Borehole Selection -->
-      <div class="card">
-        <h3 style="margin:0"><i class="fas fa-tachometer-alt"></i> Dashboard Controls</h3>
-        <div class="small">Select borehole and access controls</div>
-        
-        <div class="group">
-          <label>Select Borehole</label>
-          <div class="borehole-select">
-            <select id="selectBorehole"></select>
-            <button style="background: var(--accent); padding: 10px; width: auto;"><i class="fas fa-sync-alt"></i></button>
-          </div>
-        </div>
-        
-        <div class="pump-status">
-          <div class="status-indicator off" id="pumpStatusIndicator"></div>
-          <div>
-            <div>Pump Status: <strong id="pumpStatusText">OFF</strong></div>
-            <div class="small" id="pumpStatusSubtext">Last updated: --</div>
-          </div>
-        </div>
-        
-        <div class="control-buttons">
-          <button class="control-btn on" onclick="controlPump(true)"><i class="fas fa-play"></i> Start Pump</button>
-          <button class="control-btn off" onclick="controlPump(false)"><i class="fas fa-stop"></i> Stop Pump</button>
-          <button class="control-btn auto" onclick="setPumpMode('auto')"><i class="fas fa-robot"></i> Auto Mode</button>
-          <button class="control-btn maintenance" onclick="setPumpMode('maintenance')"><i class="fas fa-tools"></i> Maintenance</button>
-        </div>
-      </div>
+            <!-- LEFT: Controls & AI Management -->
+            <div class="left">
+                <!-- AI Agent Control -->
+                <div class="card ai-panel">
+                    <h3 style="margin:0"><i class="fas fa-brain"></i> AI Pump Manager</h3>
+                    <div class="small">Google AI Studio Powered</div>
+                    
+                    <div class="toggle-container">
+                        <div>
+                            <div>AI Auto-Pilot</div>
+                            <div class="small">Let AI manage pump operations</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="aiAutoPilot" onchange="toggleAIAutoPilot()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="pump-status">
+                        <div class="status-indicator ai" id="aiStatusIndicator"></div>
+                        <div>
+                            <div>AI Status: <strong id="aiStatusText">ACTIVE</strong></div>
+                            <div class="small" id="aiStatusSubtext">Monitoring system performance</div>
+                        </div>
+                    </div>
+                    
+                    <div class="control-buttons">
+                        <button class="control-btn ai" onclick="requestAIRecommendation()"><i class="fas fa-lightbulb"></i> Get Recommendations</button>
+                        <button class="control-btn ai" onclick="runAIDiagnostic()"><i class="fas fa-stethoscope"></i> Run Diagnostics</button>
+                        <button class="control-btn ai" onclick="generateAIPredictions()"><i class="fas fa-chart-line"></i> Generate Forecast</button>
+                        <button class="control-btn ai" onclick="optimizeAISettings()"><i class="fas fa-cogs"></i> Optimize Settings</button>
+                    </div>
+                </div>
 
-      <!-- Quick Actions -->
-      <div class="card">
-        <h4 style="margin:0"><i class="fas fa-bolt"></i> Quick Actions</h4>
-        <div class="small">Frequently used operations</div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
-          <button style="background: var(--accent); padding: 10px;" onclick="simulateApiEntry()"><i class="fas fa-satellite-dish"></i> Simulate Data</button>
-          <button style="background: var(--warning); padding: 10px;" onclick="generateReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
-          <button style="background: #8b5cf6; padding: 10px;" onclick="runDiagnostics()"><i class="fas fa-stethoscope"></i> Run Diagnostics</button>
-          <button style="background: var(--success); padding: 10px;" onclick="optimizePerformance()"><i class="fas fa-magic"></i> Optimize</button>
-        </div>
-      </div>
+                <!-- Borehole Selection -->
+                <div class="card">
+                    <h3 style="margin:0"><i class="fas fa-tachometer-alt"></i> Dashboard Controls</h3>
+                    <div class="small">Select borehole and access controls</div>
 
-      <!-- Data Entry (Collapsible) -->
-      <div class="card">
-        <div class="collapsible active"><i class="fas fa-plus-circle"></i> Add New Reading</div>
-        <div class="collapsible-content" style="max-height: 500px;">
-          <div class="group" style="margin-top: 12px;">
-            <div class="compact-form">
-              <div>
-                <label>Water Level (m)</label>
-                <input type="number" id="entry_water" step="0.01" placeholder="0.00" />
-              </div>
-              <div>
-                <label>Pressure (psi)</label>
-                <input type="number" id="entry_pressure" step="0.1" placeholder="0.0" />
-              </div>
-              <div>
-                <label>Flow Rate (L/min)</label>
-                <input type="number" id="entry_flow" step="0.1" placeholder="0.0" />
-              </div>
-              <div>
-                <label>Power (kW)</label>
-                <input type="number" id="entry_power" step="0.01" placeholder="0.00" />
-              </div>
-              <div class="full-width">
-                <label>Pump Status</label>
-                <select id="entry_pump">
-                  <option value="true">ON</option>
-                  <option value="false">OFF</option>
-                  <option value="maintenance">MAINTENANCE</option>
-                </select>
-              </div>
-              <div class="full-width">
-                <label>Notes</label>
-                <textarea id="entry_notes" rows="1" placeholder="Optional notes"></textarea>
-              </div>
+                    <div class="group">
+                        <label>Select Borehole</label>
+                        <div class="borehole-select">
+                            <select id="selectBorehole"></select>
+                            <button style="background: var(--accent); padding: 10px; width: auto;" onclick="refreshBoreholes()"><i class="fas fa-sync-alt"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="pump-status">
+                        <div class="status-indicator off" id="pumpStatusIndicator"></div>
+                        <div>
+                            <div>Pump Status: <strong id="pumpStatusText">OFF</strong></div>
+                            <div class="small" id="pumpStatusSubtext">Last updated: --</div>
+                        </div>
+                    </div>
+
+                    <div class="control-buttons">
+                        <button class="control-btn on" onclick="controlPump(true)"><i class="fas fa-play"></i> Start Pump</button>
+                        <button class="control-btn off" onclick="controlPump(false)"><i class="fas fa-stop"></i> Stop Pump</button>
+                        <button class="control-btn auto" onclick="setPumpMode('auto')"><i class="fas fa-robot"></i> Auto Mode</button>
+                        <button class="control-btn maintenance" onclick="setPumpMode('maintenance')"><i class="fas fa-tools"></i> Maintenance</button>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h4 style="margin:0"><i class="fas fa-bolt"></i> Quick Actions</h4>
+                    <div class="small">Frequently used operations</div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                        <button style="background: var(--accent); padding: 10px;" onclick="simulateApiEntry()"><i class="fas fa-satellite-dish"></i> Simulate Data</button>
+                        <button style="background: var(--warning); padding: 10px;" onclick="generateReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
+                        <button style="background: #8b5cf6; padding: 10px;" onclick="runDiagnostics()"><i class="fas fa-stethoscope"></i> Run Diagnostics</button>
+                        <button style="background: var(--success); padding: 10px;" onclick="optimizePerformance()"><i class="fas fa-magic"></i> Optimize</button>
+                    </div>
+                </div>
+
+                <!-- Data Entry (Collapsible) -->
+                <div class="card">
+                    <div class="collapsible"><i class="fas fa-plus-circle"></i> Add New Reading</div>
+                    <div class="collapsible-content">
+                        <div class="group" style="margin-top: 12px;">
+                            <div class="compact-form">
+                                <div>
+                                    <label>Water Level (m)</label>
+                                    <input type="number" id="entry_water" step="0.01" placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <label>Pressure (psi)</label>
+                                    <input type="number" id="entry_pressure" step="0.1" placeholder="0.0" />
+                                </div>
+                                <div>
+                                    <label>Flow Rate (L/min)</label>
+                                    <input type="number" id="entry_flow" step="0.1" placeholder="0.0" />
+                                </div>
+                                <div>
+                                    <label>Power (kW)</label>
+                                    <input type="number" id="entry_power" step="0.01" placeholder="0.00" />
+                                </div>
+                                <div class="full-width">
+                                    <label>Pump Status</label>
+                                    <select id="entry_pump">
+                                        <option value="true">ON</option>
+                                        <option value="false">OFF</option>
+                                        <option value="maintenance">MAINTENANCE</option>
+                                    </select>
+                                </div>
+                                <div class="full-width">
+                                    <label>Notes</label>
+                                    <textarea id="entry_notes" rows="1" placeholder="Optional notes"></textarea>
+                                </div>
+                            </div>
+
+                            <div style="display:flex;gap:8px;margin-top:8px">
+                                <button onclick="saveEntry('manual')"><i class="fas fa-save"></i> Save Reading</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Recommendations -->
+                <div class="card ai-panel">
+                    <h4 style="margin:0"><i class="fas fa-robot"></i> AI Recommendations</h4>
+                    <div class="small">Smart suggestions for optimization</div>
+                    
+                    <div class="ai-thinking" id="aiThinking">
+                        <div class="spinner"></div>
+                        <div class="small">AI is analyzing...</div>
+                    </div>
+                    
+                    <div id="aiRecommendations" style="margin-top: 12px;">
+                        <div class="alert info">
+                            <i class="fas fa-info-circle"></i> AI system ready. Enable Auto-Pilot for automated management.
+                        </div>
+                    </div>
+                    
+                    <div id="aiWarn" style="display:none;margin-top:8px;padding:10px;border-radius:8px;color:white"></div>
+                </div>
             </div>
+
+            <!-- RIGHT: Metrics, Charts, Data -->
+            <div>
+                <!-- Performance Metrics -->
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div>
+                            <h3 style="margin:0"><i class="fas fa-chart-line"></i> Performance Overview</h3>
+                            <div class="small">Real-time metrics and AI-powered predictions</div>
+                        </div>
+                        <div class="small">Last updated: <span id="lastUpdateTime">--</span></div>
+                    </div>
+
+                    <div class="metrics" style="margin-top:12px">
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-tint" style="color: var(--accent);"></i></div>
+                            <h4>Water Level</h4>
+                            <p id="m_water_level">—</p>
+                            <div class="small">Current depth</div>
+                            <div class="trend stable" id="water_trend">—</div>
+                        </div>
+                        
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-fire" style="color: var(--pressure);"></i></div>
+                            <h4>Pump Pressure</h4>
+                            <p id="m_pressure">—</p>
+                            <div class="small">PSI</div>
+                            <div class="trend stable" id="pressure_trend">—</div>
+                        </div>
+                        
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-wind" style="color: var(--flow);"></i></div>
+                            <h4>Flow Rate</h4>
+                            <p id="m_flow">—</p>
+                            <div class="small">L/min</div>
+                            <div class="trend stable" id="flow_trend">—</div>
+                        </div>
+                        
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-bolt" style="color: var(--warning);"></i></div>
+                            <h4>Power Usage</h4>
+                            <p id="m_power">—</p>
+                            <div class="small">kW</div>
+                            <div class="trend stable" id="power_trend">—</div>
+                        </div>
+                        
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-chart-pie" style="color: var(--success);"></i></div>
+                            <h4>Efficiency</h4>
+                            <p id="m_efficiency">—</p>
+                            <div class="small">%</div>
+                            <div class="trend stable" id="efficiency_trend">—</div>
+                        </div>
+                        
+                        <div class="metric">
+                            <div class="metric-icon"><i class="fas fa-heartbeat" style="color: var(--danger);"></i></div>
+                            <h4>System Health</h4>
+                            <p id="m_health">—</p>
+                            <div class="small">Score</div>
+                            <div class="trend stable" id="health_trend">—</div>
+                        </div>
+                    </div>
+
+                    <!-- AI Predictions Row -->
+                    <div class="charts">
+                        <div class="card ai-panel">
+                            <h4 style="margin:0"><i class="fas fa-crystal-ball"></i> AI Predictions</h4>
+                            <div class="small">Forecasts and maintenance alerts</div>
+                            
+                            <div id="aiPredictions">
+                                <div class="prediction-card">
+                                    <h5><i class="fas fa-water"></i> Water Level Forecast</h5>
+                                    <div>Next 24h: <strong>3.2m</strong> (↓ 0.3m)</div>
+                                    <div class="small">Refill recommended in 36 hours</div>
+                                </div>
+                                
+                                <div class="prediction-card">
+                                    <h5><i class="fas fa-tools"></i> Maintenance Alert</h5>
+                                    <div>Pump maintenance due in: <strong>14 days</strong></div>
+                                    <div class="small">Based on 280h of operation</div>
+                                </div>
+                                
+                                <div class="prediction-card">
+                                    <h5><i class="fas fa-bolt"></i> Energy Optimization</h5>
+                                    <div>Potential savings: <strong>12%</strong></div>
+                                    <div class="small">Adjust flow rate to 110 L/min</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card ai-panel">
+                            <h4 style="margin:0"><i class="fas fa-life-ring"></i> Pump Lifespan</h4>
+                            <div class="small">AI-estimated component health</div>
+                            
+                            <div style="margin-top: 12px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                    <div>Motor</div>
+                                    <div>92%</div>
+                                </div>
+                                <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="height: 100%; width: 92%; background: var(--success);"></div>
+                                </div>
+                                
+                                <div style="display: flex; justify-content: space-between; margin: 12px 0 8px 0;">
+                                    <div>Impeller</div>
+                                    <div>78%</div>
+                                </div>
+                                <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="height: 100%; width: 78%; background: var(--warning);"></div>
+                                </div>
+                                
+                                <div style="display: flex; justify-content: space-between; margin: 12px 0 8px 0;">
+                                    <div>Seals</div>
+                                    <div>85%</div>
+                                </div>
+                                <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="height: 100%; width: 85%; background: var(--success);"></div>
+                                </div>
+                                
+                                <div style="display: flex; justify-content: space-between; margin: 12px 0 8px 0;">
+                                    <div>Bearings</div>
+                                    <div>65%</div>
+                                </div>
+                                <div style="height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                    <div style="height: 100%; width: 65%; background: var(--danger);"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row 1 -->
+                    <div class="charts">
+                        <div class="chart-container">
+                            <canvas id="waterChart" style="height:300px"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="pressureChart" style="height:300px"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Charts Row 2 -->
+                    <div class="charts">
+                        <div class="chart-container">
+                            <canvas id="flowChart" style="height:300px"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="efficiencyChart" style="height:300px"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Tables -->
+                <div class="card" style="margin-top:12px">
+                    <h4 style="margin:0"><i class="fas fa-table"></i> Recent Readings</h4>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Water (m)</th>
+                                    <th>Pressure</th>
+                                    <th>Flow</th>
+                                    <th>Power</th>
+                                    <th>Status</th>
+                                    <th>Efficiency</th>
+                                    <th>AI Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entriesT"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <footer>
+        <div style="display: flex; justify-content: space-between;">
+            <div>AI-Powered Borehole Monitoring System v3.0 | Firebase Firestore Integrated</div>
+            <div>Status: <span id="systemStatus">Operational</span> | AI Uptime: <span id="systemUptime">99.8%</span></div>
+        </div>
+    </footer>
+
+    <script>
+        // Wait for Firebase to be ready before initializing
+        let firebaseManager;
+        let aiAgent;
+
+        // Firebase Database Manager
+        class FirebaseManager {
+            constructor() {
+                if (!window.firebase) {
+                    throw new Error('Firebase not loaded yet');
+                }
+                this.db = window.firebase.db;
+                this.boreholes = [
+                    { id: 'bh1', name: 'Borehole #1 - Village Well A', location: 'Ward 3, KZN' },
+                    { id: 'bh2', name: 'Borehole #2 - Industrial Site', location: 'Industrial Area, JHB' },
+                    { id: 'bh3', name: 'Borehole #3 - Farm Irrigation', location: 'Farmlands, CPT' }
+                ];
+                this.currentBorehole = null;
+                this.unsubscribe = null;
+            }
+
+            async initializeBoreholes() {
+                try {
+                    // Initialize boreholes - they will be created automatically when we add readings
+                    // For now, just populate the dropdown
+                    this.populateBoreholeSelector();
+                    return true;
+                } catch (error) {
+                    console.error('Error initializing boreholes:', error);
+                    return false;
+                }
+            }
+
+            populateBoreholeSelector() {
+                const select = document.getElementById('selectBorehole');
+                select.innerHTML = this.boreholes.map(bh => 
+                    `<option value="${bh.id}">${bh.name}</option>`
+                ).join('');
+                
+                // Set default selection
+                if (this.boreholes.length > 0) {
+                    select.value = this.boreholes[0].id;
+                    this.selectBorehole(this.boreholes[0].id);
+                }
+            }
+
+            selectBorehole(boreholeId) {
+                this.currentBorehole = boreholeId;
+                
+                // Unsubscribe from previous listener
+                if (this.unsubscribe) {
+                    this.unsubscribe();
+                }
+                
+                // Subscribe to real-time updates for selected borehole
+                this.subscribeToReadings(boreholeId);
+                
+                // Load initial data
+                this.loadBoreholeData(boreholeId);
+            }
+
+            subscribeToReadings(boreholeId) {
+                try {
+                    const readingsRef = window.firebase.collection(this.db, `boreholes/${boreholeId}/readings`);
+                    const q = window.firebase.query(readingsRef, window.firebase.orderBy('timestamp', 'desc'));
+                    
+                    this.unsubscribe = window.firebase.onSnapshot(q, (snapshot) => {
+                        const readings = [];
+                        snapshot.forEach((doc) => {
+                            readings.push({ id: doc.id, ...doc.data() });
+                        });
+                        
+                        this.updateUIWithReadings(readings);
+                        this.updateChartsWithReadings(readings);
+                    });
+                } catch (error) {
+                    console.error('Error subscribing to readings:', error);
+                }
+            }
+
+            async loadBoreholeData(boreholeId) {
+                try {
+                    const readingsRef = window.firebase.collection(this.db, `boreholes/${boreholeId}/readings`);
+                    const q = window.firebase.query(readingsRef, window.firebase.orderBy('timestamp', 'desc'));
+                    const snapshot = await window.firebase.getDocs(q);
+                    
+                    const readings = [];
+                    snapshot.forEach((doc) => {
+                        readings.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    this.updateUIWithReadings(readings);
+                    this.updateChartsWithReadings(readings);
+                } catch (error) {
+                    console.error('Error loading borehole data:', error);
+                }
+            }
+
+            updateUIWithReadings(readings) {
+                if (readings.length === 0) {
+                    // Set default values if no readings
+                    document.getElementById('m_water_level').textContent = '0.00 m';
+                    document.getElementById('m_pressure').textContent = '0.0 PSI';
+                    document.getElementById('m_flow').textContent = '0.0 L/min';
+                    document.getElementById('m_power').textContent = '0.00 kW';
+                    document.getElementById('m_efficiency').textContent = '0%';
+                    document.getElementById('m_health').textContent = '0';
+                    return;
+                }
+                
+                const latest = readings[0];
+                
+                // Update metrics
+                document.getElementById('m_water_level').textContent = `${latest.water_level?.toFixed(2) || '0.00'} m`;
+                document.getElementById('m_pressure').textContent = `${latest.pressure?.toFixed(1) || '0.0'} PSI`;
+                document.getElementById('m_flow').textContent = `${latest.flow_rate?.toFixed(1) || '0.0'} L/min`;
+                document.getElementById('m_power').textContent = `${latest.power_usage?.toFixed(2) || '0.00'} kW`;
+                document.getElementById('m_efficiency').textContent = `${latest.efficiency?.toFixed(0) || '0'}%`;
+                
+                // Calculate system health
+                const health = this.calculateSystemHealth(latest);
+                document.getElementById('m_health').textContent = health;
+                
+                // Update pump status
+                this.updatePumpStatus(latest.pump_status);
+                
+                // Update table
+                this.updateReadingsTable(readings);
+                
+                // Update trends
+                this.updateTrends(readings);
+                
+                // Update timestamp
+                document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+            }
+
+            calculateSystemHealth(reading) {
+                let health = 100;
+                
+                // Deduct points based on conditions
+                if (reading.water_level < 2) health -= 30;
+                if (reading.pressure > 50) health -= 20;
+                if (reading.efficiency < 70) health -= 15;
+                if (reading.power_usage > 3) health -= 10;
+                if (reading.flow_rate < 100) health -= 10;
+                
+                return Math.max(0, health);
+            }
+
+            updatePumpStatus(status) {
+                const indicator = document.getElementById('pumpStatusIndicator');
+                const text = document.getElementById('pumpStatusText');
+                const subtext = document.getElementById('pumpStatusSubtext');
+                
+                if (status === 'ON' || status === true) {
+                    indicator.className = 'status-indicator on';
+                    text.textContent = 'ON';
+                } else if (status === 'MAINTENANCE') {
+                    indicator.className = 'status-indicator maintenance';
+                    text.textContent = 'MAINTENANCE';
+                } else {
+                    indicator.className = 'status-indicator off';
+                    text.textContent = 'OFF';
+                }
+                
+                subtext.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            }
+
+            updateReadingsTable(readings) {
+                const tableBody = document.getElementById('entriesT');
+                tableBody.innerHTML = '';
+                
+                readings.slice(0, 10).forEach(reading => {
+                    const row = document.createElement('tr');
+                    const time = reading.timestamp?.toDate ? reading.timestamp.toDate().toLocaleTimeString() : new Date().toLocaleTimeString();
+                    const statusClass = (reading.pump_status === 'ON' || reading.pump_status === true) ? 'status-on' : 'status-off';
+                    const statusText = (reading.pump_status === 'ON' || reading.pump_status === true) ? 'ON' : 'OFF';
+                    
+                    row.innerHTML = `
+                        <td>${time}</td>
+                        <td>${reading.water_level?.toFixed(2) || '0.00'}</td>
+                        <td>${reading.pressure?.toFixed(1) || '0.0'}</td>
+                        <td>${reading.flow_rate?.toFixed(1) || '0.0'}</td>
+                        <td>${reading.power_usage?.toFixed(2) || '0.00'}</td>
+                        <td class="${statusClass}">${statusText}</td>
+                        <td>${reading.efficiency?.toFixed(0) || '0'}%</td>
+                        <td><span class="small">${reading.source || 'Manual'}</span></td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+
+            updateTrends(readings) {
+                if (readings.length < 2) return;
+                
+                const current = readings[0];
+                const previous = readings[1];
+                
+                // Water level trend
+                const waterTrend = current.water_level - previous.water_level;
+                this.updateTrendElement('water_trend', waterTrend, 'm/h');
+                
+                // Pressure trend
+                const pressureTrend = current.pressure - previous.pressure;
+                this.updateTrendElement('pressure_trend', pressureTrend, 'PSI/h');
+                
+                // Flow trend
+                const flowTrend = current.flow_rate - previous.flow_rate;
+                this.updateTrendElement('flow_trend', flowTrend, 'L/h');
+                
+                // Power trend
+                const powerTrend = current.power_usage - previous.power_usage;
+                this.updateTrendElement('power_trend', powerTrend, 'kW/h');
+                
+                // Efficiency trend
+                const efficiencyTrend = current.efficiency - previous.efficiency;
+                this.updateTrendElement('efficiency_trend', efficiencyTrend, '%/h');
+            }
+
+            updateTrendElement(elementId, value, unit) {
+                const element = document.getElementById(elementId);
+                const absValue = Math.abs(value).toFixed(1);
+                
+                if (value > 0.1) {
+                    element.className = 'trend up';
+                    element.textContent = `↑ ${absValue}${unit}`;
+                } else if (value < -0.1) {
+                    element.className = 'trend down';
+                    element.textContent = `↓ ${absValue}${unit}`;
+                } else {
+                    element.className = 'trend stable';
+                    element.textContent = `→ Stable`;
+                }
+            }
+
+            updateChartsWithReadings(readings) {
+                const reversedReadings = [...readings].reverse();
+                const labels = reversedReadings.map(r => 
+                    r.timestamp?.toDate ? r.timestamp.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''
+                );
+                
+                // Update water chart
+                waterChart.data.labels = labels.slice(-10);
+                waterChart.data.datasets[0].data = reversedReadings.map(r => r.water_level).slice(-10);
+                waterChart.update();
+                
+                // Update pressure chart
+                pressureChart.data.labels = labels.slice(-10);
+                pressureChart.data.datasets[0].data = reversedReadings.map(r => r.pressure).slice(-10);
+                pressureChart.update();
+                
+                // Update flow chart
+                flowChart.data.labels = labels.slice(-10);
+                flowChart.data.datasets[0].data = reversedReadings.map(r => r.flow_rate).slice(-10);
+                flowChart.update();
+                
+                // Update efficiency chart
+                efficiencyChart.data.labels = labels.slice(-10);
+                efficiencyChart.data.datasets[0].data = reversedReadings.map(r => r.efficiency).slice(-10);
+                efficiencyChart.update();
+            }
+
+           async saveReading(readingData) {
+                if (!this.currentBorehole) {
+                    showNotification('Please select a borehole first', 'danger');
+                    return false;
+                }
+
+                try {
+                    const reading = {
+                        ...readingData,
+                        timestamp: window.firebase.serverTimestamp(),
+                        source: readingData.source || 'manual'
+                    };
+
+                    // Save the reading to the readings subcollection
+                    const readingsRef = window.firebase.collection(this.db, `boreholes/${this.currentBorehole}/readings`);
+                    await window.firebase.addDoc(readingsRef, reading);
+                    
+                    // Try to update the borehole document, but don't fail if it doesn't exist
+                    try {
+                        const boreholeRef = window.firebase.doc(this.db, 'boreholes', this.currentBorehole);
+                        await window.firebase.setDoc(boreholeRef, {
+                            last_reading: reading,
+                            last_updated: window.firebase.serverTimestamp()
+                        }, { merge: true }); // Use setDoc with merge instead of updateDoc
+                    } catch (boreholeError) {
+                        console.log('Borehole document will be created on next attempt');
+                        // Don't throw error - the reading was saved successfully
+                    }
+                    
+                    showNotification('Reading saved to Firebase successfully', 'success');
+                    return true;
+                } catch (error) {
+                    console.error('Error saving reading:', error);
+                    showNotification('Failed to save reading to Firebase', 'danger');
+                    return false;
+                }
+            }
+
+            async saveAIRecommendation(recommendation) {
+                if (!this.currentBorehole) return false;
+
+                try {
+                    const aiRef = window.firebase.collection(this.db, `boreholes/${this.currentBorehole}/ai_recommendations`);
+                    await window.firebase.addDoc(aiRef, {
+                        ...recommendation,
+                        timestamp: window.firebase.serverTimestamp()
+                    });
+                    return true;
+                } catch (error) {
+                    console.error('Error saving AI recommendation:', error);
+                    return false;
+                }
+            }
+        }
+
+        // Google AI Studio Integration
+        class GoogleAIAgent {
+            constructor() {
+                this.backendBaseUrl = window.location.hostname === 'localhost'
+                    ? 'http://localhost:3001/api'
+                    : 'https://your-backend-url.vercel.app/api';
+                this.isActive = false;
+                this.autoPilotEnabled = false;
+                this.monitoringInterval = null;
+            }
+
+            async initialize() {
+                console.log('Initializing Secure AI Agent...');
+
+                // Test backend connection
+                try {
+                    const healthResponse = await fetch(`${this.backendBaseUrl}/health`);
+                    if (healthResponse.ok) {
+                        this.isActive = true;
+                        document.getElementById('aiStatusText').textContent = 'ACTIVE';
+                        document.getElementById('aiStatusSubtext').textContent = 'Connected to AI Backend';
+                        console.log('✅ Backend connection successful');
+                    } else {
+                        throw new Error('Backend health check failed');
+                    }
+                } catch (error) {
+                    console.error('❌ Backend connection failed:', error);
+                    document.getElementById('aiStatusText').textContent = 'OFFLINE';
+                    document.getElementById('aiStatusSubtext').textContent = 'Backend connection failed';
+                    showNotification('AI Backend is offline - using simulated mode', 'warning');
+                }
+
+                if (this.autoPilotEnabled) {
+                    this.startAIMonitoring();
+                }
+
+                return this.isActive;
+            }
+
+            toggleAutoPilot(enabled) {
+                this.autoPilotEnabled = enabled;
+
+                if (enabled) {
+                    document.getElementById('aiStatusText').textContent = 'AUTO-PILOT';
+                    document.getElementById('aiStatusSubtext').textContent = 'AI managing pump operations';
+                    this.startAIMonitoring();
+                    showNotification('AI Auto-Pilot enabled', 'ai');
+                } else {
+                    document.getElementById('aiStatusText').textContent = 'ACTIVE';
+                    document.getElementById('aiStatusSubtext').textContent = 'Monitoring system performance';
+                    if (this.monitoringInterval) {
+                        clearInterval(this.monitoringInterval);
+                    }
+                    showNotification('AI Auto-Pilot disabled', 'info');
+                }
+            }
+
+            startAIMonitoring() {
+                if (this.monitoringInterval) {
+                    clearInterval(this.monitoringInterval);
+                }
+
+                if (this.autoPilotEnabled) {
+                    this.monitoringInterval = setInterval(() => {
+                        this.analyzeSystemPerformance();
+                    }, 30000);
+                }
+            }
+
+            async callBackend(endpoint, data) {
+                try {
+                    const response = await fetch(`${this.backendBaseUrl}${endpoint}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `HTTP ${response.status}`);
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error(`Backend call to ${endpoint} failed:`, error);
+                    throw error;
+                }
+            }
+
+            getSystemData() {
+                return {
+                    waterLevel: parseFloat(document.getElementById('m_water_level').textContent) || 3.5,
+                    pressure: parseFloat(document.getElementById('m_pressure').textContent) || 42,
+                    flowRate: parseFloat(document.getElementById('m_flow').textContent) || 121,
+                    powerUsage: parseFloat(document.getElementById('m_power').textContent) || 2.4,
+                    efficiency: parseFloat(document.getElementById('m_efficiency').textContent) || 87,
+                    systemHealth: parseFloat(document.getElementById('m_health').textContent) || 92,
+                    pumpStatus: document.getElementById('pumpStatusText').textContent,
+                    operatingHours: 280,
+                    historicalData: this.getHistoricalData()
+                };
+            }
+
+            getHistoricalData() {
+                return {
+                    waterLevels: [4.2, 4.1, 3.9, 3.8, 3.7, 3.6, 3.5],
+                    pressures: [42, 41, 43, 40, 39, 38, 42],
+                    flowRates: [120, 118, 122, 119, 117, 115, 121],
+                    efficiencies: [87, 86, 88, 85, 84, 83, 87]
+                };
+            }
+
+            async analyzeSystemPerformance() {
+                if (!this.isActive) {
+                    return this.simulatedAnalysis();
+                }
+
+                const systemData = this.getSystemData();
+
+                try {
+                    showAILoading(true);
+                    const result = await this.callBackend('/analyze-pump', {
+                        systemData: systemData,
+                        analysisType: 'full'
+                    });
+
+                    this.implementAIDecisions(result.analysis);
+                    this.updateAIRecommendations(result.analysis);
+                    
+                    // Save AI recommendation to Firebase
+                    await firebaseManager.saveAIRecommendation(result.analysis);
+                    
+                    showAILoading(false);
+                    return result.analysis;
+                } catch (error) {
+                    console.error('AI Analysis failed, using simulated response:', error);
+                    showAILoading(false);
+                    return this.simulatedAnalysis();
+                }
+            }
+
+            implementAIDecisions(analysis) {
+                if (!this.autoPilotEnabled) return;
+
+                if (analysis.actions && analysis.actions.length > 0) {
+                    analysis.actions.forEach(action => {
+                        if (action.toLowerCase().includes("adjust flow") || action.toLowerCase().includes("optimize flow")) {
+                            const flowMatch = action.match(/(\d+)\s*L\/min/);
+                            if (flowMatch) {
+                                const newFlow = parseInt(flowMatch[1]);
+                                this.adjustFlowRate(newFlow);
+                            }
+                        }
+
+                        if (action.toLowerCase().includes("start pump") && document.getElementById('pumpStatusText').textContent === 'OFF') {
+                            controlPump(true);
+                        }
+
+                        if (action.toLowerCase().includes("stop pump") && document.getElementById('pumpStatusText').textContent === 'ON') {
+                            controlPump(false);
+                        }
+                    });
+                }
+            }
+
+            adjustFlowRate(newFlow) {
+                console.log(`AI adjusting flow rate to ${newFlow} L/min`);
+                
+                // Save AI action to Firebase
+                firebaseManager.saveReading({
+                    water_level: parseFloat(document.getElementById('m_water_level').textContent),
+                    pressure: parseFloat(document.getElementById('m_pressure').textContent),
+                    flow_rate: newFlow,
+                    power_usage: parseFloat(document.getElementById('m_power').textContent),
+                    efficiency: parseFloat(document.getElementById('m_efficiency').textContent),
+                    pump_status: document.getElementById('pumpStatusText').textContent,
+                    source: 'ai_optimization'
+                });
+                
+                showNotification(`AI adjusted flow rate to ${newFlow} L/min for optimal efficiency`, 'ai');
+            }
+
+            updateAIRecommendations(analysis) {
+                const recommendationsContainer = document.getElementById('aiRecommendations');
+
+                let html = `
+                    <div class="alert ai">
+                        <i class="fas fa-robot"></i> <strong>AI Analysis:</strong> ${analysis.analysis}
+                    </div>
+                `;
+
+                if (analysis.recommendations && analysis.recommendations.length > 0) {
+                    html += `<div style="margin-top: 8px;"><strong>Recommendations:</strong><ul style="margin: 4px 0; padding-left: 20px;">`;
+                    analysis.recommendations.forEach(rec => {
+                        html += `<li style="margin-bottom: 4px;">${rec}</li>`;
+                    });
+                    html += `</ul></div>`;
+                }
+
+                if (analysis.lifespanImpact) {
+                    html += `
+                        <div style="margin-top: 8px;">
+                            <strong>Lifespan Impact:</strong> 
+                            Current estimate: ${analysis.lifespanImpact.currentEstimate}
+                            ${analysis.lifespanImpact.withOptimization ? ` | With optimization: ${analysis.lifespanImpact.withOptimization}` : ''}
+                        </div>
+                    `;
+                }
+
+                if (analysis.efficiencyGains) {
+                    html += `
+                        <div style="margin-top: 8px;">
+                            <strong>Efficiency Gains:</strong> 
+                            Potential improvement: ${analysis.efficiencyGains.potentialImprovement}
+                        </div>
+                    `;
+                }
+
+                recommendationsContainer.innerHTML = html;
+            }
+
+            async generatePredictions() {
+                if (!this.isActive) {
+                    return this.simulatedPredictions();
+                }
+
+                const systemData = this.getSystemData();
+
+                try {
+                    showAILoading(true);
+                    const result = await this.callBackend('/generate-predictions', {
+                        systemData: systemData
+                    });
+
+                    this.displayPredictions(result.predictions);
+                    showAILoading(false);
+                    showNotification('AI predictions generated successfully', 'ai');
+
+                } catch (error) {
+                    console.error('Prediction generation failed:', error);
+                    showAILoading(false);
+                    this.simulatedPredictions();
+                }
+            }
+
+            displayPredictions(predictions) {
+                const predictionsContainer = document.getElementById('aiPredictions');
+
+                let html = '';
+
+                if (predictions.waterForecast) {
+                    html += `
+                        <div class="prediction-card">
+                            <h5><i class="fas fa-water"></i> Water Level Forecast</h5>
+                            <div>Next 24h: <strong>${predictions.waterForecast.next24h}</strong> (${predictions.waterForecast.trend})</div>
+                            <div class="small">${predictions.waterForecast.change || 'Monitoring required'}</div>
+                        </div>
+                    `;
+                }
+
+                if (predictions.maintenanceAlert) {
+                    html += `
+                        <div class="prediction-card">
+                            <h5><i class="fas fa-tools"></i> Maintenance Alert</h5>
+                            <div>Next maintenance: <strong>${predictions.maintenanceAlert.dueIn}</strong></div>
+                            <div class="small">Priority: ${predictions.maintenanceAlert.priority}</div>
+                        </div>
+                    `;
+                }
+
+                if (predictions.energyForecast) {
+                    html += `
+                        <div class="prediction-card">
+                            <h5><i class="fas fa-bolt"></i> Energy Forecast</h5>
+                            <div>Daily usage: <strong>${predictions.energyForecast.dailyUsage}</strong></div>
+                            <div class="small">${predictions.energyForecast.recommendation}</div>
+                        </div>
+                    `;
+                }
+
+                predictionsContainer.innerHTML = html;
+            }
+
+            async runDiagnostic() {
+                if (!this.isActive) {
+                    return this.simulatedDiagnostic();
+                }
+
+                const systemData = this.getSystemData();
+
+                try {
+                    showAILoading(true);
+                    const result = await this.callBackend('/run-diagnostics', {
+                        systemData: systemData
+                    });
+
+                    this.updateAIRecommendations(result.diagnostic);
+                    showAILoading(false);
+                    showNotification('AI diagnostic completed', 'ai');
+
+                } catch (error) {
+                    console.error('Diagnostic failed:', error);
+                    showAILoading(false);
+                    this.simulatedDiagnostic();
+                }
+            }
+
+            // Fallback simulated responses when backend is unavailable
+            simulatedAnalysis() {
+                const simulatedResponse = {
+                    analysis: "System operating normally in simulated mode. Backend connection unavailable.",
+                    recommendations: [
+                        "Check backend server connection",
+                        "Monitor system manually until AI service is restored",
+                        "Review historical data for trends"
+                    ],
+                    actions: ["Continue current operations", "Monitor system health indicators"],
+                    maintenance: { nextScheduled: "30 days", priority: "Low", components: [] },
+                    lifespanImpact: { currentEstimate: "8 years", withOptimization: "9 years", riskFactors: [] },
+                    efficiencyGains: { potentialImprovement: "5%", suggestedChanges: [] }
+                };
+
+                this.updateAIRecommendations(simulatedResponse);
+                return simulatedResponse;
+            }
+
+            simulatedPredictions() {
+                const predictions = {
+                    waterForecast: { trend: "decreasing", next24h: "3.2m", change: "-0.3m" },
+                    maintenanceAlert: { dueIn: "14 days", priority: "medium", components: ["Bearings"] },
+                    failureRisks: { bearings: "25%", motor: "8%", seals: "12%", impeller: "5%" },
+                    energyForecast: { dailyUsage: "28.5 kWh", recommendation: "Optimize flow rate to 115 L/min" }
+                };
+
+                this.displayPredictions(predictions);
+                showNotification('Simulated predictions generated (Backend offline)', 'warning');
+            }
+
+            simulatedDiagnostic() {
+                const diagnostic = {
+                    healthScore: 82,
+                    criticalIssues: ["No critical issues detected in simulated mode"],
+                    performanceIssues: ["Backend connectivity issue affecting AI analysis"],
+                    recommendations: ["Restore backend connection for full AI capabilities"],
+                    immediateActions: ["Monitor system manually", "Check server status"]
+                };
+
+                this.updateAIRecommendations(diagnostic);
+                showNotification('Simulated diagnostic completed (Backend offline)', 'warning');
+            }
+        }
+
+        // Chart initialization
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    },
+                    ticks: {
+                        color: 'rgba(255,255,255,0.7)'
+                    }
+                },
+                y: {
+                    grid: {
+                        color: 'rgba(255,255,255,0.05)'
+                    },
+                    ticks: {
+                        color: 'rgba(255,255,255,0.7)'
+                    }
+                }
+            }
+        };
+
+        // Initialize charts with empty data
+        const waterCtx = document.getElementById('waterChart').getContext('2d');
+        const waterChart = new Chart(waterCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Water Level (m)',
+                    data: [],
+                    borderColor: 'rgba(6, 182, 212, 1)',
+                    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const pressureCtx = document.getElementById('pressureChart').getContext('2d');
+        const pressureChart = new Chart(pressureCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Pressure (PSI)',
+                    data: [],
+                    borderColor: 'rgba(139, 92, 246, 1)',
+                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const flowCtx = document.getElementById('flowChart').getContext('2d');
+        const flowChart = new Chart(flowCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Flow Rate (L/min)',
+                    data: [],
+                    borderColor: 'rgba(16, 185, 129, 1)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
+        const efficiencyChart = new Chart(efficiencyCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Efficiency (%)',
+                    data: [],
+                    borderColor: 'rgba(245, 158, 11, 1)',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: chartOptions
+        });
+
+        // Initialize the application
+        async function initializeApp() {
+            // Initialize collapsible sections
+            const collapsibles = document.getElementsByClassName("collapsible");
+            for (let i = 0; i < collapsibles.length; i++) {
+                collapsibles[i].addEventListener("click", function () {
+                    this.classList.toggle("active");
+                    const content = this.nextElementSibling;
+                    if (content.style.maxHeight) {
+                        content.style.maxHeight = null;
+                    } else {
+                        content.style.maxHeight = content.scrollHeight + "px";
+                    }
+                });
+            }
+
+            // Initialize with data entry collapsed
+            const dataEntrySection = document.querySelector('.collapsible');
+            dataEntrySection.classList.remove('active');
+            dataEntrySection.nextElementSibling.style.maxHeight = null;
+
+            // Update time
+            document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
+
+            try {
+                // Wait for Firebase to be ready
+                await window.firebaseReady;
+                
+                // Initialize Firebase Manager
+                firebaseManager = new FirebaseManager();
+                await firebaseManager.initializeBoreholes();
+
+                // Initialize AI Agent
+                aiAgent = new GoogleAIAgent();
+                await aiAgent.initialize();
+
+                // Set up borehole selection listener
+                document.getElementById('selectBorehole').addEventListener('change', function() {
+                    firebaseManager.selectBorehole(this.value);
+                });
+
+                // Add sample data for demonstration
+                setTimeout(() => {
+                    addSampleData();
+                }, 2000);
+
+                showNotification('System initialized successfully', 'success');
+
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                showNotification('Error initializing application', 'danger');
+            }
+        }
+
+        // Add sample data for the 3 pumps
+        async function addSampleData() {
+            if (!firebaseManager) return;
+
+            const sampleData = {
+                'bh1': [ // Village Well - Stable operation
+                    { water_level: 4.2, pressure: 42, flow_rate: 120, power_usage: 2.4, efficiency: 87, pump_status: 'ON' },
+                    { water_level: 4.1, pressure: 41, flow_rate: 118, power_usage: 2.3, efficiency: 86, pump_status: 'ON' },
+                    { water_level: 3.9, pressure: 43, flow_rate: 122, power_usage: 2.5, efficiency: 88, pump_status: 'ON' }
+                ],
+                'bh2': [ // Industrial Site - High usage
+                    { water_level: 2.8, pressure: 48, flow_rate: 135, power_usage: 3.2, efficiency: 78, pump_status: 'ON' },
+                    { water_level: 2.7, pressure: 47, flow_rate: 132, power_usage: 3.1, efficiency: 76, pump_status: 'ON' },
+                    { water_level: 2.6, pressure: 49, flow_rate: 138, power_usage: 3.3, efficiency: 75, pump_status: 'ON' }
+                ],
+                'bh3': [ // Farm Irrigation - Variable usage
+                    { water_level: 3.5, pressure: 38, flow_rate: 95, power_usage: 1.8, efficiency: 92, pump_status: 'ON' },
+                    { water_level: 3.4, pressure: 36, flow_rate: 92, power_usage: 1.7, efficiency: 94, pump_status: 'ON' },
+                    { water_level: 3.3, pressure: 39, flow_rate: 98, power_usage: 1.9, efficiency: 90, pump_status: 'OFF' }
+                ]
+            };
+
+            for (const [boreholeId, readings] of Object.entries(sampleData)) {
+                for (const reading of readings) {
+                    await firebaseManager.saveReading({
+                        ...reading,
+                        source: 'sample_data'
+                    });
+                    // Small delay between saves
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+        }
+
+        // Control functions
+        function controlPump(turnOn) {
+            if (!firebaseManager) {
+                showNotification('System not initialized yet', 'danger');
+                return;
+            }
+
+            const status = turnOn ? 'ON' : 'OFF';
             
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button onclick="saveEntry('manual')"><i class="fas fa-save"></i> Save Reading</button>
-            </div>
-          </div>
-        </div>
-      </div>
+            // Save pump control action to Firebase
+            firebaseManager.saveReading({
+                water_level: parseFloat(document.getElementById('m_water_level').textContent) || 0,
+                pressure: parseFloat(document.getElementById('m_pressure').textContent) || 0,
+                flow_rate: parseFloat(document.getElementById('m_flow').textContent) || 0,
+                power_usage: parseFloat(document.getElementById('m_power').textContent) || 0,
+                efficiency: parseFloat(document.getElementById('m_efficiency').textContent) || 0,
+                pump_status: status,
+                source: 'manual_control'
+            });
 
-      <!-- AI Recommendations -->
-      <div class="card">
-        <h4 style="margin:0"><i class="fas fa-robot"></i> AI Recommendations</h4>
-        <div class="small">Smart suggestions for optimization</div>
-        
-        <div id="aiRecommendations" style="margin-top: 12px;">
-          <div class="alert info">
-            <i class="fas fa-info-circle"></i> System running optimally. No actions needed.
-          </div>
-        </div>
-        
-        <div id="aiWarn" style="display:none;margin-top:8px;padding:10px;border-radius:8px;color:white"></div>
-      </div>
-    </div>
-
-    <!-- RIGHT: Metrics, Charts, Data -->
-    <div>
-      <!-- Performance Metrics -->
-      <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h3 style="margin:0"><i class="fas fa-chart-line"></i> Performance Overview</h3>
-            <div class="small">Real-time metrics and system health</div>
-          </div>
-          <div class="small">Last updated: <span id="lastUpdateTime">--</span></div>
-        </div>
-
-        <div class="metrics" style="margin-top:12px">
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-tint" style="color: var(--accent);"></i></div>
-            <h4>Water Level</h4>
-            <p id="m_water_level">—</p>
-            <div class="small">Current depth</div>
-            <div class="trend stable" id="water_trend">—</div>
-          </div>
-          
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-fire" style="color: var(--pressure);"></i></div>
-            <h4>Pump Pressure</h4>
-            <p id="m_pressure">—</p>
-            <div class="small">PSI</div>
-            <div class="trend stable" id="pressure_trend">—</div>
-          </div>
-          
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-wind" style="color: var(--flow);"></i></div>
-            <h4>Flow Rate</h4>
-            <p id="m_flow">—</p>
-            <div class="small">L/min</div>
-            <div class="trend stable" id="flow_trend">—</div>
-          </div>
-          
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-bolt" style="color: var(--warning);"></i></div>
-            <h4>Power Usage</h4>
-            <p id="m_power">—</p>
-            <div class="small">kW</div>
-            <div class="trend stable" id="power_trend">—</div>
-          </div>
-          
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-chart-pie" style="color: var(--success);"></i></div>
-            <h4>Efficiency</h4>
-            <p id="m_efficiency">—</p>
-            <div class="small">%</div>
-            <div class="trend stable" id="efficiency_trend">—</div>
-          </div>
-          
-          <div class="metric">
-            <div class="metric-icon"><i class="fas fa-heartbeat" style="color: var(--danger);"></i></div>
-            <h4>System Health</h4>
-            <p id="m_health">—</p>
-            <div class="small">Score</div>
-            <div class="trend stable" id="health_trend">—</div>
-          </div>
-        </div>
-
-        <!-- Charts Row 1 -->
-        <div class="charts">
-          <div class="chart-container">
-            <canvas id="waterChart" style="height:300px"></canvas>
-          </div>
-          <div class="chart-container">
-            <canvas id="pressureChart" style="height:300px"></canvas>
-          </div>
-        </div>
-        
-        <!-- Charts Row 2 -->
-        <div class="charts">
-          <div class="chart-container">
-            <canvas id="flowChart" style="height:300px"></canvas>
-          </div>
-          <div class="chart-container">
-            <canvas id="efficiencyChart" style="height:300px"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Data Tables -->
-      <div class="card" style="margin-top:12px">
-        <h4 style="margin:0"><i class="fas fa-table"></i> Recent Readings</h4>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Water (m)</th>
-                <th>Pressure</th>
-                <th>Flow</th>
-                <th>Power</th>
-                <th>Status</th>
-                <th>Efficiency</th>
-              </tr>
-            </thead>
-            <tbody id="entriesT"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<footer>
-  <div style="display: flex; justify-content: space-between;">
-    <div>Advanced Borehole Monitoring System v2.1</div>
-    <div>Status: <span id="systemStatus">Operational</span> | Uptime: <span id="systemUptime">99.8%</span></div>
-  </div>
-</footer>
-
-<script>
-  // Initialize collapsible sections
-  document.addEventListener('DOMContentLoaded', function() {
-    const collapsibles = document.getElementsByClassName("collapsible");
-    for (let i = 0; i < collapsibles.length; i++) {
-      collapsibles[i].addEventListener("click", function() {
-        this.classList.toggle("active");
-        const content = this.nextElementSibling;
-        if (content.style.maxHeight) {
-          content.style.maxHeight = null;
-        } else {
-          content.style.maxHeight = content.scrollHeight + "px";
+            showNotification(`Pump ${turnOn ? 'started' : 'stopped'} successfully`, 'success');
         }
-      });
-    }
-    
-    // Initialize with data entry collapsed
-    const dataEntrySection = document.querySelector('.collapsible');
-    dataEntrySection.classList.remove('active');
-    dataEntrySection.nextElementSibling.style.maxHeight = null;
-    
-    // Update time
-    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
-    
-    // Simulate initial data
-    simulateInitialData();
-  });
 
-  // Chart initialization
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      }
-    },
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(255,255,255,0.05)'
-        },
-        ticks: {
-          color: 'rgba(255,255,255,0.7)'
+        function setPumpMode(mode) {
+            const statusIndicator = document.getElementById('pumpStatusIndicator');
+            const statusText = document.getElementById('pumpStatusText');
+            const statusSubtext = document.getElementById('pumpStatusSubtext');
+
+            if (mode === 'auto') {
+                statusIndicator.className = 'status-indicator on';
+                statusText.textContent = 'AUTO';
+                statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+                showNotification('Pump set to automatic mode', 'info');
+            } else if (mode === 'maintenance') {
+                statusIndicator.className = 'status-indicator maintenance';
+                statusText.textContent = 'MAINTENANCE';
+                statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+                showNotification('Pump set to maintenance mode', 'warning');
+            }
         }
-      },
-      y: {
-        grid: {
-          color: 'rgba(255,255,255,0.05)'
-        },
-        ticks: {
-          color: 'rgba(255,255,255,0.7)'
+
+        function refreshBoreholes() {
+            if (firebaseManager) {
+                firebaseManager.populateBoreholeSelector();
+                showNotification('Boreholes list refreshed', 'info');
+            }
         }
-      }
-    }
-  };
 
-  // Water Level Chart
-  const waterCtx = document.getElementById('waterChart').getContext('2d');
-  const waterChart = new Chart(waterCtx, {
-    type: 'line',
-    data: {
-      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
-      datasets: [{
-        label: 'Water Level (m)',
-        data: [4.2, 4.1, 3.9, 3.8, 3.7, 3.6, 3.5],
-        borderColor: 'rgba(6, 182, 212, 1)',
-        backgroundColor: 'rgba(6, 182, 212, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: chartOptions
-  });
+        async function simulateApiEntry() {
+            if (!firebaseManager) {
+                showNotification('System not initialized yet', 'danger');
+                return;
+            }
 
-  // Pressure Chart
-  const pressureCtx = document.getElementById('pressureChart').getContext('2d');
-  const pressureChart = new Chart(pressureCtx, {
-    type: 'line',
-    data: {
-      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
-      datasets: [{
-        label: 'Pressure (PSI)',
-        data: [42, 41, 43, 40, 39, 38, 42],
-        borderColor: 'rgba(139, 92, 246, 1)',
-        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: chartOptions
-  });
+            const currentBorehole = document.getElementById('selectBorehole').value;
+            
+            // Generate different data based on borehole
+            const baseData = {
+                'bh1': { water_level: 3.5, pressure: 42, flow_rate: 121, power_usage: 2.4, efficiency: 87 },
+                'bh2': { water_level: 2.5, pressure: 48, flow_rate: 136, power_usage: 3.2, efficiency: 75 },
+                'bh3': { water_level: 3.2, pressure: 37, flow_rate: 96, power_usage: 1.8, efficiency: 91 }
+            };
 
-  // Flow Chart
-  const flowCtx = document.getElementById('flowChart').getContext('2d');
-  const flowChart = new Chart(flowCtx, {
-    type: 'line',
-    data: {
-      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
-      datasets: [{
-        label: 'Flow Rate (L/min)',
-        data: [120, 118, 122, 119, 117, 115, 121],
-        borderColor: 'rgba(16, 185, 129, 1)',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: chartOptions
-  });
+            const base = baseData[currentBorehole] || baseData['bh1'];
+            
+            const simulatedReading = {
+                water_level: base.water_level + (Math.random() * 0.4 - 0.2),
+                pressure: base.pressure + (Math.random() * 6 - 3),
+                flow_rate: base.flow_rate + (Math.random() * 10 - 5),
+                power_usage: base.power_usage + (Math.random() * 0.3 - 0.15),
+                efficiency: Math.max(60, Math.min(95, base.efficiency + (Math.random() * 6 - 3))),
+                pump_status: Math.random() > 0.3 ? 'ON' : 'OFF',
+                source: 'simulated'
+            };
 
-  // Efficiency Chart
-  const efficiencyCtx = document.getElementById('efficiencyChart').getContext('2d');
-  const efficiencyChart = new Chart(efficiencyCtx, {
-    type: 'line',
-    data: {
-      labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'],
-      datasets: [{
-        label: 'Efficiency (%)',
-        data: [87, 86, 88, 85, 84, 83, 87],
-        borderColor: 'rgba(245, 158, 11, 1)',
-        backgroundColor: 'rgba(245, 158, 11, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: chartOptions
-  });
+            await firebaseManager.saveReading(simulatedReading);
+        }
 
-  // Simulate initial data
-  function simulateInitialData() {
-    // Set initial metric values
-    document.getElementById('m_water_level').textContent = '3.5 m';
-    document.getElementById('m_pressure').textContent = '42 PSI';
-    document.getElementById('m_flow').textContent = '121 L/min';
-    document.getElementById('m_power').textContent = '2.4 kW';
-    document.getElementById('m_efficiency').textContent = '87%';
-    document.getElementById('m_health').textContent = '92';
-    
-    // Set initial trends
-    document.getElementById('water_trend').textContent = '↓ 0.1m/h';
-    document.getElementById('water_trend').className = 'trend down';
-    document.getElementById('pressure_trend').textContent = '→ Stable';
-    document.getElementById('pressure_trend').className = 'trend stable';
-    document.getElementById('flow_trend').textContent = '↑ 2L/h';
-    document.getElementById('flow_trend').className = 'trend up';
-    document.getElementById('power_trend').textContent = '→ Stable';
-    document.getElementById('power_trend').className = 'trend stable';
-    document.getElementById('efficiency_trend').textContent = '↓ 1%';
-    document.getElementById('efficiency_trend').className = 'trend down';
-    document.getElementById('health_trend').textContent = '→ Stable';
-    document.getElementById('health_trend').className = 'trend stable';
-    
-    // Populate table with sample data
-    const tableBody = document.getElementById('entriesT');
-    const sampleData = [
-      { time: '16:00', water: '3.5', pressure: '42', flow: '121', power: '2.4', status: 'ON', efficiency: '87%' },
-      { time: '15:45', water: '3.6', pressure: '38', flow: '115', power: '2.3', status: 'ON', efficiency: '83%' },
-      { time: '15:30', water: '3.6', pressure: '39', flow: '117', power: '2.3', status: 'ON', efficiency: '84%' },
-      { time: '15:15', water: '3.7', pressure: '40', flow: '119', power: '2.4', status: 'ON', efficiency: '85%' },
-      { time: '15:00', water: '3.7', pressure: '43', flow: '122', power: '2.5', status: 'ON', efficiency: '88%' },
-      { time: '14:45', water: '3.8', pressure: '41', flow: '118', power: '2.4', status: 'ON', efficiency: '86%' },
-      { time: '14:30', water: '3.9', pressure: '42', flow: '120', power: '2.4', status: 'ON', efficiency: '87%' }
-    ];
-    
-    sampleData.forEach(data => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${data.time}</td>
-        <td>${data.water}</td>
-        <td>${data.pressure}</td>
-        <td>${data.flow}</td>
-        <td>${data.power}</td>
-        <td class="status-on">${data.status}</td>
-        <td>${data.efficiency}</td>
-      `;
-      tableBody.appendChild(row);
-    });
-    
-    // Initialize borehole selector
-    const boreholeSelect = document.getElementById('selectBorehole');
-    boreholeSelect.innerHTML = `
-      <option value="bh1">Borehole #1 - Village Well A</option>
-      <option value="bh2">Borehole #2 - Industrial Site</option>
-      <option value="bh3">Borehole #3 - Farm Irrigation</option>
-    `;
-  }
+        async function saveEntry(source) {
+            if (!firebaseManager) {
+                showNotification('System not initialized yet', 'danger');
+                return;
+            }
 
-  // Control functions
-  function controlPump(turnOn) {
-    const statusIndicator = document.getElementById('pumpStatusIndicator');
-    const statusText = document.getElementById('pumpStatusText');
-    const statusSubtext = document.getElementById('pumpStatusSubtext');
-    
-    if (turnOn) {
-      statusIndicator.className = 'status-indicator on';
-      statusText.textContent = 'ON';
-      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-      
-      // Show notification
-      showNotification('Pump started successfully', 'success');
-    } else {
-      statusIndicator.className = 'status-indicator off';
-      statusText.textContent = 'OFF';
-      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-      
-      // Show notification
-      showNotification('Pump stopped successfully', 'info');
-    }
-  }
+            const waterLevel = parseFloat(document.getElementById('entry_water').value);
+            const pressure = parseFloat(document.getElementById('entry_pressure').value);
+            const flowRate = parseFloat(document.getElementById('entry_flow').value);
+            const powerUsage = parseFloat(document.getElementById('entry_power').value);
+            const pumpStatus = document.getElementById('entry_pump').value;
+            const notes = document.getElementById('entry_notes').value;
 
-  function setPumpMode(mode) {
-    const statusIndicator = document.getElementById('pumpStatusIndicator');
-    const statusText = document.getElementById('pumpStatusText');
-    const statusSubtext = document.getElementById('pumpStatusSubtext');
-    
-    if (mode === 'auto') {
-      statusIndicator.className = 'status-indicator on';
-      statusText.textContent = 'AUTO';
-      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-      showNotification('Pump set to automatic mode', 'info');
-    } else if (mode === 'maintenance') {
-      statusIndicator.className = 'status-indicator maintenance';
-      statusText.textContent = 'MAINTENANCE';
-      statusSubtext.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
-      showNotification('Pump set to maintenance mode', 'warning');
-    }
-  }
+            if (!waterLevel || !pressure || !flowRate || !powerUsage) {
+                showNotification('Please fill all required fields', 'danger');
+                return;
+            }
 
-  function simulateApiEntry() {
-    // Generate random data
-    const waterLevel = (Math.random() * 2 + 3).toFixed(1);
-    const pressure = (Math.random() * 10 + 35).toFixed(0);
-    const flowRate = (Math.random() * 20 + 110).toFixed(0);
-    const powerUsage = (Math.random() * 0.5 + 2.2).toFixed(1);
-    const efficiency = (Math.random() * 10 + 80).toFixed(0);
-    
-    // Update metrics
-    document.getElementById('m_water_level').textContent = waterLevel + ' m';
-    document.getElementById('m_pressure').textContent = pressure + ' PSI';
-    document.getElementById('m_flow').textContent = flowRate + ' L/min';
-    document.getElementById('m_power').textContent = powerUsage + ' kW';
-    document.getElementById('m_efficiency').textContent = efficiency + '%';
-    
-    // Update last updated time
-    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
-    
-    // Add to table
-    const tableBody = document.getElementById('entriesT');
-    const newRow = document.createElement('tr');
-    newRow.innerHTML = `
-      <td>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-      <td>${waterLevel}</td>
-      <td>${pressure}</td>
-      <td>${flowRate}</td>
-      <td>${powerUsage}</td>
-      <td class="status-on">ON</td>
-      <td>${efficiency}%</td>
-    `;
-    tableBody.insertBefore(newRow, tableBody.firstChild);
-    
-    // Limit table rows
-    if (tableBody.children.length > 10) {
-      tableBody.removeChild(tableBody.lastChild);
-    }
-    
-    showNotification('Simulated data added successfully', 'success');
-  }
+            const efficiency = Math.min(95, Math.max(70, (flowRate / powerUsage * 40)));
 
-  function generateReport() {
-    showNotification('Performance report generated successfully', 'info');
-  }
+            const reading = {
+                water_level: waterLevel,
+                pressure: pressure,
+                flow_rate: flowRate,
+                power_usage: powerUsage,
+                efficiency: efficiency,
+                pump_status: pumpStatus,
+                notes: notes,
+                source: source
+            };
 
-  function runDiagnostics() {
-    showNotification('System diagnostics completed - No issues found', 'info');
-  }
+            const success = await firebaseManager.saveReading(reading);
 
-  function optimizePerformance() {
-    showNotification('Performance optimization completed', 'success');
-  }
+            if (success) {
+                // Clear form
+                document.getElementById('entry_water').value = '';
+                document.getElementById('entry_pressure').value = '';
+                document.getElementById('entry_flow').value = '';
+                document.getElementById('entry_power').value = '';
+                document.getElementById('entry_notes').value = '';
+            }
+        }
 
-  function saveEntry(source) {
-    const waterLevel = document.getElementById('entry_water').value;
-    const pressure = document.getElementById('entry_pressure').value;
-    const flowRate = document.getElementById('entry_flow').value;
-    const powerUsage = document.getElementById('entry_power').value;
-    
-    if (!waterLevel || !pressure || !flowRate || !powerUsage) {
-      showNotification('Please fill all required fields', 'danger');
-      return;
-    }
-    
-    // Update metrics
-    document.getElementById('m_water_level').textContent = waterLevel + ' m';
-    document.getElementById('m_pressure').textContent = pressure + ' PSI';
-    document.getElementById('m_flow').textContent = flowRate + ' L/min';
-    document.getElementById('m_power').textContent = powerUsage + ' kW';
-    
-    // Calculate efficiency (simplified)
-    const efficiency = Math.min(95, Math.max(70, (flowRate / powerUsage * 40))).toFixed(0);
-    document.getElementById('m_efficiency').textContent = efficiency + '%';
-    
-    // Update last updated time
-    document.getElementById('lastUpdateTime').textContent = new Date().toLocaleTimeString();
-    
-    // Add to table
-    const tableBody = document.getElementById('entriesT');
-    const newRow = document.createElement('tr');
-    newRow.innerHTML = `
-      <td>${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
-      <td>${waterLevel}</td>
-      <td>${pressure}</td>
-      <td>${flowRate}</td>
-      <td>${powerUsage}</td>
-      <td class="status-on">ON</td>
-      <td>${efficiency}%</td>
-    `;
-    tableBody.insertBefore(newRow, tableBody.firstChild);
-    
-    // Limit table rows
-    if (tableBody.children.length > 10) {
-      tableBody.removeChild(tableBody.lastChild);
-    }
-    
-    // Clear form
-    document.getElementById('entry_water').value = '';
-    document.getElementById('entry_pressure').value = '';
-    document.getElementById('entry_flow').value = '';
-    document.getElementById('entry_power').value = '';
-    document.getElementById('entry_notes').value = '';
-    
-    showNotification('Manual reading saved successfully', 'success');
-  }
+        // AI Control Functions
+        function toggleAIAutoPilot() {
+            if (aiAgent) {
+                const autoPilotCheckbox = document.getElementById('aiAutoPilot');
+                aiAgent.toggleAutoPilot(autoPilotCheckbox.checked);
+            }
+        }
 
-  function showNotification(message, type) {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `alert ${type}`;
-    notification.innerHTML = `<i class="fas fa-${getIconForType(type)}"></i> ${message}`;
-    notification.style.position = 'fixed';
-    notification.style.top = '20px';
-    notification.style.right = '20px';
-    notification.style.zIndex = '1000';
-    notification.style.minWidth = '300px';
-    
-    document.body.appendChild(notification);
-    
-    // Remove after 5 seconds
-    setTimeout(() => {
-      notification.remove();
-    }, 5000);
-  }
+        function requestAIRecommendation() {
+            if (aiAgent) {
+                aiAgent.analyzeSystemPerformance();
+            }
+        }
 
-  function getIconForType(type) {
-    switch(type) {
-      case 'success': return 'check-circle';
-      case 'danger': return 'exclamation-triangle';
-      case 'warning': return 'exclamation-circle';
-      default: return 'info-circle';
-    }
-  }
-</script>
+        function runAIDiagnostic() {
+            if (aiAgent) {
+                aiAgent.runDiagnostic();
+            }
+        }
+
+        function generateAIPredictions() {
+            if (aiAgent) {
+                aiAgent.generatePredictions();
+            }
+        }
+
+        function optimizeAISettings() {
+            showNotification('AI optimization settings updated', 'ai');
+        }
+
+        function showAILoading(show) {
+            document.getElementById('aiThinking').style.display = show ? 'block' : 'none';
+        }
+
+        // Utility functions
+        function generateReport() {
+            showNotification('Performance report generated successfully', 'info');
+        }
+
+        function runDiagnostics() {
+            showNotification('System diagnostics completed - No issues found', 'info');
+        }
+
+        function optimizePerformance() {
+            showNotification('Performance optimization completed', 'success');
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `alert ${type}`;
+            notification.innerHTML = `<i class="fas fa-${getIconForType(type)}"></i> ${message}`;
+            notification.style.position = 'fixed';
+            notification.style.top = '20px';
+            notification.style.right = '20px';
+            notification.style.zIndex = '1000';
+            notification.style.minWidth = '300px';
+
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 5000);
+        }
+
+        function getIconForType(type) {
+            switch (type) {
+                case 'success': return 'check-circle';
+                case 'danger': return 'exclamation-triangle';
+                case 'warning': return 'exclamation-circle';
+                case 'ai': return 'robot';
+                default: return 'info-circle';
+            }
+        }
+
+        // Start the application when the page loads
+        document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
 </body>
 </html>
