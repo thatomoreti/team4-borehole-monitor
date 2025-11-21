@@ -7,6 +7,8 @@
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Ethers.js for Blockchain -->
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.umd.min.js" type="application/javascript"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -18,7 +20,7 @@
         collection, 
         addDoc, 
         doc, 
-        setDoc,  // MAKE SURE THIS IS INCLUDED
+        setDoc,
         onSnapshot, 
         updateDoc, 
         serverTimestamp, 
@@ -46,7 +48,7 @@
             collection,
             addDoc,
             doc,
-            setDoc,  // AND THIS
+            setDoc,
             onSnapshot,
             updateDoc,
             serverTimestamp,
@@ -526,12 +528,54 @@
         input:checked + .toggle-slider:before {
             transform: translateX(26px);
         }
+
+        /* Blockchain Status Styles */
+        .blockchain-status {
+            padding: 8px 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        
+        .blockchain-connected {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+        
+        .blockchain-disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+        
+        .blockchain-pending {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--warning);
+        }
+        
+        .blockchain-panel {
+            border-left: 3px solid #8b5cf6;
+            background: rgba(139, 92, 246, 0.05);
+        }
+        
+        .transaction-status {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.05);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
     <header>
         <h1><i class="fas fa-robot"></i> AI-Powered Borehole & Pump Dashboard</h1>
-        <div class="muted">Firebase Firestore • Real-time Data • AI Management</div>
+        <div class="muted">Firebase Firestore • Blockchain • Real-time Data • AI Management</div>
     </header>
 
     <div class="container">
@@ -539,6 +583,32 @@
 
             <!-- LEFT: Controls & AI Management -->
             <div class="left">
+                <!-- Blockchain Status Panel -->
+                <div class="card blockchain-panel">
+                    <h3 style="margin:0"><i class="fas fa-link"></i> Blockchain Status</h3>
+                    <div class="small">Ethereum Sepolia Testnet</div>
+                    
+                    <div class="blockchain-status" id="blockchainStatus">
+                        <i class="fas fa-sync fa-spin"></i>
+                        <span>Connecting to blockchain...</span>
+                    </div>
+                    
+                    <div class="small" id="blockchainInfo" style="margin-top: 8px;">
+                        Contract: <span id="contractAddress">Not connected</span><br>
+                        Account: <span id="userAccount">Not connected</span><br>
+                        Network: <span id="networkName">Unknown</span>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;">
+                        <button style="background: #8b5cf6; padding: 8px;" onclick="connectBlockchain()" id="connectBlockchainBtn">
+                            <i class="fas fa-plug"></i> Connect
+                        </button>
+                        <button style="background: var(--accent); padding: 8px;" onclick="syncToBlockchain()" id="syncBlockchainBtn" disabled>
+                            <i class="fas fa-cloud-upload-alt"></i> Sync Data
+                        </button>
+                    </div>
+                </div>
+
                 <!-- AI Agent Control -->
                 <div class="card ai-panel">
                     <h3 style="margin:0"><i class="fas fa-brain"></i> AI Pump Manager</h3>
@@ -610,6 +680,12 @@
                         <button style="background: var(--warning); padding: 10px;" onclick="generateReport()"><i class="fas fa-chart-bar"></i> Generate Report</button>
                         <button style="background: #8b5cf6; padding: 10px;" onclick="runDiagnostics()"><i class="fas fa-stethoscope"></i> Run Diagnostics</button>
                         <button style="background: var(--success); padding: 10px;" onclick="optimizePerformance()"><i class="fas fa-magic"></i> Optimize</button>
+                        <button style="background: #10b981; padding: 10px;" onclick="registerBoreholeOnChain()" id="registerBoreholeBtn" disabled>
+                            <i class="fas fa-link"></i> Register on Chain
+                        </button>
+                        <button style="background: #8b5cf6; padding: 10px;" onclick="addReadingToChain()" id="addReadingBtn" disabled>
+                            <i class="fas fa-database"></i> Add to Blockchain
+                        </button>
                     </div>
                 </div>
 
@@ -651,6 +727,9 @@
 
                             <div style="display:flex;gap:8px;margin-top:8px">
                                 <button onclick="saveEntry('manual')"><i class="fas fa-save"></i> Save Reading</button>
+                                <button onclick="saveEntryToBlockchain()" id="saveToChainBtn" disabled style="background: #8b5cf6;">
+                                    <i class="fas fa-link"></i> Save to Blockchain
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -686,6 +765,18 @@
                             <div class="small">Real-time metrics and AI-powered predictions</div>
                         </div>
                         <div class="small">Last updated: <span id="lastUpdateTime">--</span></div>
+                    </div>
+
+                    <!-- Blockchain Transaction Status -->
+                    <div id="transactionStatus" style="display: none; margin: 12px 0; padding: 10px; border-radius: 8px; background: rgba(139, 92, 246, 0.1);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-cube fa-spin"></i>
+                            <div>
+                                <strong>Blockchain Transaction</strong>
+                                <div class="small" id="transactionMessage">Processing...</div>
+                                <a href="#" id="transactionLink" target="_blank" style="color: #8b5cf6; text-decoration: none;">View on Explorer</a>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="metrics" style="margin-top:12px">
@@ -730,11 +821,11 @@
                         </div>
                         
                         <div class="metric">
-                            <div class="metric-icon"><i class="fas fa-heartbeat" style="color: var(--danger);"></i></div>
-                            <h4>System Health</h4>
-                            <p id="m_health">—</p>
-                            <div class="small">Score</div>
-                            <div class="trend stable" id="health_trend">—</div>
+                            <div class="metric-icon"><i class="fas fa-link" style="color: #8b5cf6;"></i></div>
+                            <h4>Blockchain</h4>
+                            <p id="m_blockchain">—</p>
+                            <div class="small">Readings</div>
+                            <div class="trend stable" id="blockchain_trend">—</div>
                         </div>
                     </div>
 
@@ -840,7 +931,7 @@
                                     <th>Power</th>
                                     <th>Status</th>
                                     <th>Efficiency</th>
-                                    <th>AI Action</th>
+                                    <th>Source</th>
                                 </tr>
                             </thead>
                             <tbody id="entriesT"></tbody>
@@ -848,18 +939,993 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
 
     <footer>
         <div style="display: flex; justify-content: space-between;">
-            <div>AI-Powered Borehole Monitoring System v3.0 | Firebase Firestore Integrated</div>
-            <div>Status: <span id="systemStatus">Operational</span> | AI Uptime: <span id="systemUptime">99.8%</span></div>
+            <div>AI-Powered Borehole Monitoring System v3.0 | Firebase + Blockchain Integrated</div>
+            <div>Status: <span id="systemStatus">Operational</span> | Blockchain: <span id="blockchainUptime">Connecting...</span></div>
         </div>
     </footer>
 
     <script>
+        // ==================== BLOCKCHAIN CONFIGURATION ====================
+      const BLOCKCHAIN_CONFIG = {
+    // Your deployed contract address
+    contractAddress: "0x10Ba41DeE4dD0520c194Ca4bb4B2dCa51a700D0C",
+    
+    // Updated with your actual contract ABI
+    contractABI: [
+	{
+		"inputs": [],
+		"name": "AlreadyExists",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BoreholeInactive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidValue",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotRegistered",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TooMany",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "BoreholeRegistered",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "isActive",
+				"type": "bool"
+			}
+		],
+		"name": "BoreholeStatusToggled",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint40",
+				"name": "timestamp",
+				"type": "uint40"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint24",
+				"name": "waterLevel",
+				"type": "uint24"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint16",
+				"name": "pressure",
+				"type": "uint16"
+			}
+		],
+		"name": "ReadingAdded",
+		"type": "event"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint24",
+				"name": "_waterLevel",
+				"type": "uint24"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_pressure",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_flowRate",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_powerUsage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_efficiency",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "_pumpStatus",
+				"type": "bool"
+			}
+		],
+		"name": "addReading",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_packed",
+				"type": "uint256"
+			}
+		],
+		"name": "addReadingPacked",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "_packedReadings",
+				"type": "uint256[]"
+			}
+		],
+		"name": "addReadingsBatchPacked",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_location",
+				"type": "string"
+			}
+		],
+		"name": "registerBorehole",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			}
+		],
+		"name": "toggleBoreholeStatus",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "boreholeReadings",
+		"outputs": [
+			{
+				"internalType": "uint40",
+				"name": "timestamp",
+				"type": "uint40"
+			},
+			{
+				"internalType": "uint24",
+				"name": "waterLevel",
+				"type": "uint24"
+			},
+			{
+				"internalType": "uint16",
+				"name": "pressure",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "flowRate",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "powerUsage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint8",
+				"name": "efficiency",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "pumpStatus",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"name": "boreholes",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "id",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "location",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "uint40",
+				"name": "createdAt",
+				"type": "uint40"
+			},
+			{
+				"internalType": "bool",
+				"name": "isActive",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint32",
+				"name": "readingCount",
+				"type": "uint32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_value",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_decimals",
+				"type": "uint256"
+			}
+		],
+		"name": "convertToReadable",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			}
+		],
+		"name": "getBoreholeInfo",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "location",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"internalType": "uint40",
+				"name": "createdAt",
+				"type": "uint40"
+			},
+			{
+				"internalType": "bool",
+				"name": "isActive",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint32",
+				"name": "readingCount",
+				"type": "uint32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_count",
+				"type": "uint256"
+			}
+		],
+		"name": "getLatestReadings",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint40",
+						"name": "timestamp",
+						"type": "uint40"
+					},
+					{
+						"internalType": "uint24",
+						"name": "waterLevel",
+						"type": "uint24"
+					},
+					{
+						"internalType": "uint16",
+						"name": "pressure",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint16",
+						"name": "flowRate",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint16",
+						"name": "powerUsage",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint8",
+						"name": "efficiency",
+						"type": "uint8"
+					},
+					{
+						"internalType": "bool",
+						"name": "pumpStatus",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct BoreholeMonitor.Reading[]",
+				"name": "out",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_index",
+				"type": "uint256"
+			}
+		],
+		"name": "getReading",
+		"outputs": [
+			{
+				"internalType": "uint40",
+				"name": "timestamp",
+				"type": "uint40"
+			},
+			{
+				"internalType": "uint24",
+				"name": "waterLevel",
+				"type": "uint24"
+			},
+			{
+				"internalType": "uint16",
+				"name": "pressure",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "flowRate",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "powerUsage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint8",
+				"name": "efficiency",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "pumpStatus",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "_boreholeId",
+				"type": "bytes32"
+			}
+		],
+		"name": "getReadingCount",
+		"outputs": [
+			{
+				"internalType": "uint32",
+				"name": "",
+				"type": "uint32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_BATCH",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint24",
+				"name": "_waterLevel",
+				"type": "uint24"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_pressure",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_flowRate",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_powerUsage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_efficiency",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "_pumpStatus",
+				"type": "bool"
+			}
+		],
+		"name": "packData",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint40",
+				"name": "_timestamp",
+				"type": "uint40"
+			},
+			{
+				"internalType": "uint24",
+				"name": "_waterLevel",
+				"type": "uint24"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_pressure",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_flowRate",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint16",
+				"name": "_powerUsage",
+				"type": "uint16"
+			},
+			{
+				"internalType": "uint8",
+				"name": "_efficiency",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "_pumpStatus",
+				"type": "bool"
+			}
+		],
+		"name": "packDataWithTimestamp",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_packed",
+				"type": "uint256"
+			}
+		],
+		"name": "unpackData",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint40",
+						"name": "timestamp",
+						"type": "uint40"
+					},
+					{
+						"internalType": "uint24",
+						"name": "waterLevel",
+						"type": "uint24"
+					},
+					{
+						"internalType": "uint16",
+						"name": "pressure",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint16",
+						"name": "flowRate",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint16",
+						"name": "powerUsage",
+						"type": "uint16"
+					},
+					{
+						"internalType": "uint8",
+						"name": "efficiency",
+						"type": "uint8"
+					},
+					{
+						"internalType": "bool",
+						"name": "pumpStatus",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct BoreholeMonitor.Reading",
+				"name": "r",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "pure",
+		"type": "function"
+	}
+],
+            
+    networks: {
+        sepolia: {
+            chainId: "0xaa36a7",
+            chainName: "Sepolia Testnet",
+            rpcUrls: ["https://sepolia.infura.io/v3/"],
+            blockExplorer: "https://sepolia.etherscan.io"
+        }
+    }
+};
+
+        // Blockchain Manager Class
+        class BlockchainManager {
+            constructor() {
+                this.provider = null;
+                this.signer = null;
+                this.contract = null;
+                this.userAddress = null;
+                this.isConnected = false;
+            }
+
+            async connect() {
+                try {
+                    // Check if MetaMask is installed
+                    if (!window.ethereum) {
+                        throw new Error("MetaMask not installed. Please install MetaMask to use blockchain features.");
+                    }
+
+                    // Request account access
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+                    
+                    this.userAddress = accounts[0];
+                    
+                    // Create provider and signer
+                    this.provider = new ethers.providers.Web3Provider(window.ethereum);
+                    this.signer = this.provider.getSigner();
+                    
+                    // Check network
+                    const network = await this.provider.getNetwork();
+                    const sepoliaChainId = parseInt(BLOCKCHAIN_CONFIG.networks.sepolia.chainId, 16);
+                    
+                    if (network.chainId !== sepoliaChainId) {
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: BLOCKCHAIN_CONFIG.networks.sepolia.chainId }],
+                            });
+                        } catch (switchError) {
+                            if (switchError.code === 4902) {
+                                await window.ethereum.request({
+                                    method: 'wallet_addEthereumChain',
+                                    params: [BLOCKCHAIN_CONFIG.networks.sepolia],
+                                });
+                            } else {
+                                throw switchError;
+                            }
+                        }
+                    }
+
+                    // Create contract instance
+                    this.contract = new ethers.Contract(
+                        BLOCKCHAIN_CONFIG.contractAddress,
+                        BLOCKCHAIN_CONFIG.contractABI,
+                        this.signer
+                    );
+
+                    this.isConnected = true;
+                    
+                    // Update UI
+                    this.updateBlockchainStatus('connected', 'Connected to Sepolia Testnet');
+                    document.getElementById('contractAddress').textContent = BLOCKCHAIN_CONFIG.contractAddress.slice(0, 6) + '...' + BLOCKCHAIN_CONFIG.contractAddress.slice(-4);
+                    document.getElementById('userAccount').textContent = this.userAddress.slice(0, 6) + '...' + this.userAddress.slice(-4);
+                    document.getElementById('networkName').textContent = 'Sepolia Testnet';
+                    
+                    // Enable blockchain buttons
+                    document.getElementById('syncBlockchainBtn').disabled = false;
+                    document.getElementById('registerBoreholeBtn').disabled = false;
+                    document.getElementById('addReadingBtn').disabled = false;
+                    document.getElementById('saveToChainBtn').disabled = false;
+                    document.getElementById('connectBlockchainBtn').textContent = 'Connected';
+                    document.getElementById('connectBlockchainBtn').style.background = 'var(--success)';
+
+                    // Load blockchain data
+                    this.loadBlockchainData();
+
+                    return true;
+
+                } catch (error) {
+                    console.error('Blockchain connection failed:', error);
+                    this.updateBlockchainStatus('disconnected', error.message);
+                    return false;
+                }
+            }
+
+            updateBlockchainStatus(status, message) {
+                const statusElement = document.getElementById('blockchainStatus');
+                const icon = statusElement.querySelector('i');
+                const text = statusElement.querySelector('span');
+                
+                statusElement.className = `blockchain-status blockchain-${status}`;
+                text.textContent = message;
+                
+                switch(status) {
+                    case 'connected':
+                        icon.className = 'fas fa-check-circle';
+                        break;
+                    case 'disconnected':
+                        icon.className = 'fas fa-times-circle';
+                        break;
+                    case 'pending':
+                        icon.className = 'fas fa-sync fa-spin';
+                        break;
+                }
+            }
+
+            async loadBlockchainData() {
+    if (!this.isConnected) return;
+
+    try {
+        // Note: You'll need to track borehole IDs since they're bytes32 now
+        // For now, we'll just update the count if we have a current borehole
+        const currentBorehole = this.getCurrentBoreholeId(); // You'll need to implement this
+        
+        if (currentBorehole) {
+            const readingCount = await this.contract.getReadingCount(currentBorehole);
+            const count = parseInt(readingCount);
+            
+            document.getElementById('m_blockchain').textContent = count;
+            
+            const trendElement = document.getElementById('blockchain_trend');
+            trendElement.textContent = `${count} readings`;
+            trendElement.className = 'trend stable';
+        }
+
+    } catch (error) {
+        console.error('Error loading blockchain data:', error);
+    }
+}
+// Helper function to convert string to bytes32
+stringToBytes32(str) {
+    return ethers.utils.formatBytes32String(str);
+}
+
+// Helper function to convert bytes32 to string
+bytes32ToString(bytes32Str) {
+    return ethers.utils.parseBytes32String(bytes32Str);
+}
+
+           async registerBorehole(name, location) {
+    if (!this.isConnected) {
+        throw new Error("Blockchain not connected");
+    }
+
+    try {
+        this.updateBlockchainStatus('pending', 'Registering borehole on blockchain...');
+        
+        const transaction = await this.contract.registerBorehole(name, location);
+        
+        this.showTransactionStatus(transaction.hash, 'Registering borehole...');
+        
+        const receipt = await transaction.wait();
+        
+        // Get the borehole ID from the transaction receipt
+        const boreholeId = await this.contract.registerBorehole.staticCall(name, location);
+        
+        this.showTransactionStatus(transaction.hash, 'Borehole registered successfully!', true);
+        this.updateBlockchainStatus('connected', 'Borehole registered on blockchain');
+        
+        return { receipt, boreholeId };
+
+    } catch (error) {
+        console.error('Error registering borehole:', error);
+        this.updateBlockchainStatus('connected', 'Transaction failed');
+        throw error;
+    }
+}
+
+           async addReading(boreholeId, readingData) {
+    if (!this.isConnected) {
+        throw new Error("Blockchain not connected");
+    }
+
+    try {
+        this.updateBlockchainStatus('pending', 'Adding reading to blockchain...');
+        
+        // Convert values to contract format with proper types
+        const waterLevel = Math.round(readingData.water_level * 100); // meters to cm (uint24)
+        const pressure = Math.round(readingData.pressure * 10);      // PSI to tenths (uint16)
+        const flowRate = Math.round(readingData.flow_rate * 10);     // L/min to tenths (uint16)
+        const powerUsage = Math.round(readingData.power_usage * 100); // kW to hundredths (uint16)
+        const efficiency = Math.round(readingData.efficiency);       // percentage (uint8)
+        const pumpStatus = readingData.pump_status === 'ON' || readingData.pump_status === true;
+
+        // Ensure values are within contract limits
+        const waterLevelFinal = Math.min(waterLevel, 16777215); // uint24 max
+        const pressureFinal = Math.min(pressure, 65535);        // uint16 max
+        const flowRateFinal = Math.min(flowRate, 65535);        // uint16 max
+        const powerUsageFinal = Math.min(powerUsage, 65535);    // uint16 max
+        const efficiencyFinal = Math.min(efficiency, 255);      // uint8 max
+
+        const transaction = await this.contract.addReading(
+            boreholeId, // bytes32
+            waterLevelFinal,
+            pressureFinal,
+            flowRateFinal,
+            powerUsageFinal,
+            efficiencyFinal,
+            pumpStatus
+        );
+        
+        this.showTransactionStatus(transaction.hash, 'Adding reading to blockchain...');
+        
+        const receipt = await transaction.wait();
+        
+        this.showTransactionStatus(transaction.hash, 'Reading added to blockchain!', true);
+        this.updateBlockchainStatus('connected', 'Reading stored on blockchain');
+        
+        return receipt;
+
+    } catch (error) {
+        console.error('Error adding reading to blockchain:', error);
+        this.updateBlockchainStatus('connected', 'Transaction failed');
+        throw error;
+    }
+}
+
+
+            showTransactionStatus(hash, message, isComplete = false) {
+                const statusElement = document.getElementById('transactionStatus');
+                const messageElement = document.getElementById('transactionMessage');
+                const linkElement = document.getElementById('transactionLink');
+                
+                statusElement.style.display = 'block';
+                messageElement.textContent = message;
+                linkElement.href = `https://sepolia.etherscan.io/tx/${hash}`;
+                linkElement.textContent = 'View Transaction';
+                
+                if (isComplete) {
+                    setTimeout(() => {
+                        statusElement.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            async getBoreholeReadings(boreholeId) {
+                if (!this.isConnected) return [];
+
+                try {
+                    const readingCount = await this.contract.getReadingCount(boreholeId);
+                    const count = parseInt(readingCount);
+                    
+                    const readings = [];
+                    for (let i = 0; i < count; i++) {
+                        const reading = await this.contract.getReading(boreholeId, i);
+                        readings.push({
+                            timestamp: new Date(Number(reading.timestamp) * 1000),
+                            water_level: Number(reading.waterLevel) / 100,
+                            pressure: Number(reading.pressure) / 10,
+                            flow_rate: Number(reading.flowRate) / 10,
+                            power_usage: Number(reading.powerUsage) / 100,
+                            efficiency: Number(reading.efficiency),
+                            pump_status: reading.pumpStatus,
+                            source: 'blockchain'
+                        });
+                    }
+                    
+                    return readings;
+
+                } catch (error) {
+                    console.error('Error fetching blockchain readings:', error);
+                    return [];
+                }
+            }
+        }
+
+        // Global blockchain manager instance
+        let blockchainManager;
+
         // Wait for Firebase to be ready before initializing
         let firebaseManager;
         let aiAgent;
@@ -1660,6 +2726,9 @@
                 firebaseManager = new FirebaseManager();
                 await firebaseManager.initializeBoreholes();
 
+                // Initialize Blockchain Manager
+                blockchainManager = new BlockchainManager();
+                
                 // Initialize AI Agent
                 aiAgent = new GoogleAIAgent();
                 await aiAgent.initialize();
@@ -1667,6 +2736,9 @@
                 // Set up borehole selection listener
                 document.getElementById('selectBorehole').addEventListener('change', function() {
                     firebaseManager.selectBorehole(this.value);
+                    if (blockchainManager.isConnected) {
+                        blockchainManager.loadBlockchainData();
+                    }
                 });
 
                 // Add sample data for demonstration
@@ -1869,6 +2941,155 @@
 
         function showAILoading(show) {
             document.getElementById('aiThinking').style.display = show ? 'block' : 'none';
+        }
+
+        // Blockchain Functions
+        async function connectBlockchain() {
+            if (blockchainManager) {
+                const success = await blockchainManager.connect();
+                if (success) {
+                    showNotification('Connected to blockchain successfully', 'success');
+                } else {
+                    showNotification('Failed to connect to blockchain', 'danger');
+                }
+            }
+        }
+
+        async function registerBoreholeOnChain() {
+            if (!blockchainManager || !blockchainManager.isConnected) {
+                showNotification('Please connect to blockchain first', 'warning');
+                return;
+            }
+
+            const currentBorehole = document.getElementById('selectBorehole').value;
+            const boreholes = {
+                'bh1': { name: 'Village Well A', location: 'Ward 3, KZN' },
+                'bh2': { name: 'Industrial Site', location: 'Industrial Area, JHB' },
+                'bh3': { name: 'Farm Irrigation', location: 'Farmlands, CPT' }
+            };
+
+            const borehole = boreholes[currentBorehole];
+            if (!borehole) {
+                showNotification('Please select a valid borehole', 'warning');
+                return;
+            }
+
+            try {
+                await blockchainManager.registerBorehole(currentBorehole, borehole.name, borehole.location);
+                showNotification('Borehole registered on blockchain!', 'success');
+            } catch (error) {
+                showNotification('Failed to register borehole: ' + error.message, 'danger');
+            }
+        }
+
+        async function addReadingToChain() {
+            if (!blockchainManager || !blockchainManager.isConnected) {
+                showNotification('Please connect to blockchain first', 'warning');
+                return;
+            }
+
+            const currentBorehole = document.getElementById('selectBorehole').value;
+            if (!currentBorehole) {
+                showNotification('Please select a borehole first', 'warning');
+                return;
+            }
+
+            // Get current reading data from UI
+            const readingData = {
+                water_level: parseFloat(document.getElementById('m_water_level').textContent) || 0,
+                pressure: parseFloat(document.getElementById('m_pressure').textContent) || 0,
+                flow_rate: parseFloat(document.getElementById('m_flow').textContent) || 0,
+                power_usage: parseFloat(document.getElementById('m_power').textContent) || 0,
+                efficiency: parseFloat(document.getElementById('m_efficiency').textContent) || 0,
+                pump_status: document.getElementById('pumpStatusText').textContent
+            };
+
+            try {
+                await blockchainManager.addReading(currentBorehole, readingData);
+                showNotification('Reading added to blockchain!', 'success');
+            } catch (error) {
+                showNotification('Failed to add reading: ' + error.message, 'danger');
+            }
+        }
+
+        async function saveEntryToBlockchain() {
+            if (!blockchainManager || !blockchainManager.isConnected) {
+                showNotification('Please connect to blockchain first', 'warning');
+                return;
+            }
+
+            const waterLevel = parseFloat(document.getElementById('entry_water').value);
+            const pressure = parseFloat(document.getElementById('entry_pressure').value);
+            const flowRate = parseFloat(document.getElementById('entry_flow').value);
+            const powerUsage = parseFloat(document.getElementById('entry_power').value);
+            const pumpStatus = document.getElementById('entry_pump').value;
+
+            if (!waterLevel || !pressure || !flowRate || !powerUsage) {
+                showNotification('Please fill all required fields', 'danger');
+                return;
+            }
+
+            const efficiency = Math.min(95, Math.max(70, (flowRate / powerUsage * 40)));
+            const currentBorehole = document.getElementById('selectBorehole').value;
+
+            const readingData = {
+                water_level: waterLevel,
+                pressure: pressure,
+                flow_rate: flowRate,
+                power_usage: powerUsage,
+                efficiency: efficiency,
+                pump_status: pumpStatus
+            };
+
+            try {
+                await blockchainManager.addReading(currentBorehole, readingData);
+                
+                // Also save to Firebase
+                await firebaseManager.saveReading({
+                    ...readingData,
+                    source: 'blockchain_manual'
+                });
+                
+                // Clear form
+                document.getElementById('entry_water').value = '';
+                document.getElementById('entry_pressure').value = '';
+                document.getElementById('entry_flow').value = '';
+                document.getElementById('entry_power').value = '';
+                document.getElementById('entry_notes').value = '';
+                
+            } catch (error) {
+                showNotification('Failed to save to blockchain: ' + error.message, 'danger');
+            }
+        }
+
+        async function syncToBlockchain() {
+            if (!blockchainManager || !blockchainManager.isConnected) {
+                showNotification('Please connect to blockchain first', 'warning');
+                return;
+            }
+
+            const currentBorehole = document.getElementById('selectBorehole').value;
+            if (!currentBorehole) {
+                showNotification('Please select a borehole first', 'warning');
+                return;
+            }
+
+            try {
+                // Get latest reading from Firebase
+                const readingsRef = window.firebase.collection(window.firebase.db, `boreholes/${currentBorehole}/readings`);
+                const q = window.firebase.query(readingsRef, window.firebase.orderBy('timestamp', 'desc'));
+                const snapshot = await window.firebase.getDocs(q);
+                
+                if (!snapshot.empty) {
+                    const latestReading = snapshot.docs[0].data();
+                    await blockchainManager.addReading(currentBorehole, latestReading);
+                    showNotification('Latest reading synced to blockchain!', 'success');
+                } else {
+                    showNotification('No readings found to sync', 'warning');
+                }
+            } catch (error) {
+                showNotification('Failed to sync to blockchain: ' + error.message, 'danger');
+            }
         }
 
         // Utility functions

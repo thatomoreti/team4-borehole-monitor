@@ -1,0 +1,223 @@
+:root {
+    --bg: #06070a;
+    --card: #0f1720;
+    --muted: #9ca3af;
+    --accent: #06b6d4;
+    --glass: rgba(255,255,255,0.04);
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --soft: #111316;
+    --pressure: #8b5cf6;
+    --flow: #10b981;
+    --ai-primary: #8b5cf6;
+    --ai-secondary: #a78bfa;
+}
+
+* {
+    box-sizing: border-box
+}
+
+body {
+    font-family: Inter,system-ui,Arial,sans-serif;
+    margin: 0;
+    background: linear-gradient(180deg,#03040a 0%, #071025 100%);
+    color: #e6eef6;
+    min-height: 100vh;
+}
+
+header {
+    padding: 18px 28px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: rgba(15, 23, 32, 0.7);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600
+}
+
+.container {
+    max-width: 1600px;
+    margin: 20px auto;
+    padding: 0 18px
+}
+
+.layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px
+}
+
+.card {
+    background: linear-gradient(180deg,var(--card),#0b1220);
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.6);
+    border: 1px solid rgba(255,255,255,0.03)
+}
+
+.muted {
+    color: var(--muted);
+    font-size: 13px
+}
+
+label {
+    display: block;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #cbd5e1
+}
+
+input, select, textarea, button {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--soft);
+    border: 1px solid rgba(255,255,255,0.03);
+    color: inherit
+}
+
+button {
+    background: var(--accent);
+    border: none;
+    color: #022;
+    cursor: pointer;
+    font-weight: 600
+}
+
+.left .group {
+    margin-bottom: 14px
+}
+
+.borehole-select {
+    display: flex;
+    gap: 8px
+}
+
+.borehole-select select {
+    flex: 1
+}
+
+.small {
+    font-size: 13px;
+    color: #99a3b4
+}
+
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit,minmax(180px,1fr));
+    gap: 12px;
+    align-items: stretch;
+    margin-bottom: 12px
+}
+
+.metric {
+    padding: 12px;
+    border-radius: 10px;
+    background: linear-gradient(180deg,rgba(255,255,255,0.02),transparent);
+}
+
+.metric h4 {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted)
+}
+
+.metric p {
+    margin: 6px 0 0;
+    font-size: 20px;
+    font-weight: 600
+}
+
+.metric .trend {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.metric .trend.up {
+    color: var(--success);
+}
+
+.metric .trend.down {
+    color: var(--danger);
+}
+
+.metric .trend.stable {
+    color: var(--muted);
+}
+
+.charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.chart-container {
+    background: transparent;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.table-wrap {
+    max-height: 260px;
+    overflow: auto
+}
+
+footer {
+    max-width: 1600px;
+    margin: 18px auto;
+    padding: 12px 18px;
+    color: var(--muted);
+    font-size: 13px
+}
+
+/* Blockchain Status Styles */
+.blockchain-status {
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.blockchain-connected {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: var(--success);
+}
+
+.blockchain-disconnected {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: var(--danger);
+}
+
+.blockchain-pending {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: var(--warning);
+}
+
+.blockchain-panel {
+    border-left: 3px solid #8b5cf6;
+    background: rgba(139, 92, 246, 0.05);
+}
+
+.transaction-status {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    margin-top: 4px;
+}
+
+/* Rest of your existing styles... */
+/* (Include all the other styles from your original CSS here) */
